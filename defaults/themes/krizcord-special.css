@@ -4,6 +4,8 @@
  * @author MaliKriz
  * @version 3.0.0
  * @background arkaplan
+ * @logo logo
+ * @input mesaj-kutusu
  */
 
 /*
@@ -11,6 +13,11 @@
  * "@background arkaplan" satırı themes klasöründeki arkaplan.mp4 / .webm / .gif / .png / .jpg
  * dosyasını kullanır. Başka bir dosya koymak için aynı adla değiştirmen yeterli.
  * Adres de yazabilirsin:  @background https://ornek.com/video.mp4
+ *
+ * RESİMLER (GIF de olur)
+ *   logo.png / .gif / .jpg          → sol üstteki Discord logosunun yerine
+ *   mesaj-kutusu.png / .gif / .jpg  → mesaj yazma kutusunun arkasına
+ * Dosyayı bu adlarla themes klasörüne bırakman yeterli. Yoksa Discord'un kendisi görünür.
  *
  * PERFORMANS
  * Panellerin arkasında canlı bulanıklık (backdrop-filter) YOK: video arkasında en çok GPU harcayan
@@ -31,6 +38,9 @@
 
   --kc-bg-dim: 0.45; /* videoyu karart: 0 = hiç, 0.8 = çok */
   --kc-bg-position: center; /* videonun hangi kısmı görünsün: center, left, right, 40% 50% ... */
+
+  --kc-input-dim: 0.55; /* mesaj kutusu resmini karart (yazı okunsun) */
+  --kc-input-position: center; /* resmin hangi kısmı görünsün */
 
   --kc-radius: 10px;
   --kc-font: "Inter", "gg sans", "Segoe UI", sans-serif;
@@ -222,8 +232,36 @@ section:is([class^="panels_"], [class*=" panels_"]) {
   background: rgba(var(--kc-ink), 0.88) !important;
 }
 
+/* Ses ve kullanıcı paneli düğmeleri: sade, ince çerçeveli */
+section:is([class^="panels_"], [class*=" panels_"]) button:not([class*="red" i]):not([class*="danger" i]) {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+section:is([class^="panels_"], [class*=" panels_"]) button:not([class*="red" i]):not([class*="danger" i]):not([aria-checked="true"]) {
+  color: var(--interactive-normal) !important;
+}
+section:is([class^="panels_"], [class*=" panels_"]) button:not([class*="red" i]):not([class*="danger" i]):hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
 /* ============================================================
-   4. KANALLAR VE ÜYELER
+   4. ÖZEL LOGO (sol üst, Direkt Mesajlar düğmesi)
+   ============================================================ */
+
+html.krizcord-has-logo [data-list-item-id="guildsnav___home"] {
+  background: var(--krizcord-logo) center / cover no-repeat !important;
+}
+html.krizcord-has-logo [data-list-item-id="guildsnav___home"] > *,
+html.krizcord-has-logo [data-list-item-id="guildsnav___home"] svg {
+  opacity: 0 !important;
+}
+
+/* ============================================================
+   5. KANALLAR VE ÜYELER
    ============================================================ */
 
 :is([class^="containerDefault_"], [class*=" containerDefault_"]) :is([class^="link_"], [class*=" link_"]) {
@@ -248,7 +286,7 @@ section:is([class^="panels_"], [class*=" panels_"]) {
 }
 
 /* ============================================================
-   5. MESAJLAR
+   6. MESAJLAR
    ============================================================ */
 
 /* Bahsedildiğin mesajlar: tek ince çizgi */
@@ -280,7 +318,7 @@ pre code,
 }
 
 /* ============================================================
-   6. MESAJ KUTUSU
+   7. MESAJ KUTUSU
    ============================================================ */
 
 :is([class^="channelTextArea_"], [class*=" channelTextArea_"]) {
@@ -294,12 +332,22 @@ pre code,
   border-color: rgba(236, 230, 228, 0.35) !important;
 }
 
+/* Mesaj kutusunun arkasına özel resim (mesaj-kutusu.png/.gif) */
+html.krizcord-has-input :is([class^="channelTextArea_"], [class*=" channelTextArea_"]) {
+  background-image:
+    linear-gradient(rgba(var(--kc-ink), var(--kc-input-dim)), rgba(var(--kc-ink), var(--kc-input-dim))),
+    var(--krizcord-input) !important;
+  background-size: cover !important;
+  background-position: var(--kc-input-position) !important;
+  background-repeat: no-repeat !important;
+}
+
 :is([class^="channelTextArea_"], [class*=" channelTextArea_"]) :is([class^="scrollableContainer_"], [class*=" scrollableContainer_"]) {
   background: transparent !important;
 }
 
 /* ============================================================
-   7. MENÜLER VE AÇILIR PENCERELER — düz, bulanıklık yok
+   8. MENÜLER VE AÇILIR PENCERELER — düz, bulanıklık yok
    ============================================================ */
 
 :is([class^="menu_"], [class*=" menu_"]),
@@ -323,21 +371,8 @@ pre code,
 }
 
 /* ============================================================
-   8. DÜĞMELER, SEÇİM, KAYDIRMA ÇUBUĞU
+   9. SEÇİM, KAYDIRMA ÇUBUĞU
    ============================================================ */
-
-/* Ana düğmeler: açık zemin, koyu yazı */
-button[class*="colorBrand_"] {
-  background: var(--kc-light) !important;
-  color: #141517 !important;
-  border-radius: 8px !important;
-}
-button[class*="colorBrand_"] * {
-  color: inherit !important;
-}
-button[class*="colorBrand_"]:hover {
-  background: #ffffff !important;
-}
 
 ::selection {
   background: rgba(236, 230, 228, 0.3);

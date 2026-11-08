@@ -36,6 +36,8 @@ function all() {
         author: meta.author || "",
         version: meta.version || "",
         background: meta.background || "",
+        logo: meta.logo || "",
+        input: meta.input || "",
         css: t.css,
         builtin: false,
       };
@@ -158,12 +160,54 @@ document.addEventListener("visibilitychange", () => {
   else v.play().catch(() => {});
 });
 
+// --- Tema resimleri: @logo, @input -----------------------------------------------------
+// Etkin temadaki "@logo dosya" / "@input dosya" resimleri sayfaya CSS değişkeni olarak konur:
+//   --krizcord-logo, --krizcord-input  (url(blob:...))  ve <html>'e krizcord-has-logo / krizcord-has-input sınıfı.
+// Tema CSS'i bu değişkenleri istediği yerde kullanır.
+const IMAGE_SLOTS = ["logo", "input"];
+const slots = Object.fromEntries(IMAGE_SLOTS.map((n) => [n, { ref: null, stamp: null, url: null, seq: 0 }]));
+
+function clearSlot(name) {
+  const st = slots[name];
+  document.documentElement.style.removeProperty(`--krizcord-${name}`);
+  document.documentElement.classList.remove(`krizcord-has-${name}`);
+  if (st.url) URL.revokeObjectURL(st.url);
+  Object.assign(st, { ref: null, stamp: null, url: null });
+}
+
+async function applySlot(name, ref) {
+  const st = slots[name];
+  const seq = ++st.seq;
+  if (!ref) return clearSlot(name);
+  const res = await native().themeMedia?.(ref, st.ref === ref ? st.stamp : null);
+  if (seq !== st.seq) return;
+  if (!res || res.error) {
+    native().log?.(`tema resmi (${name}) yüklenemedi:`, ref, res?.error || "bilinmeyen hata");
+    return clearSlot(name);
+  }
+  if (res.same) return;
+  if (!res.mime.startsWith("image/")) {
+    native().log?.(`tema resmi (${name}) bir resim değil:`, ref, res.mime);
+    return clearSlot(name);
+  }
+  const url = URL.createObjectURL(new Blob([res.data], { type: res.mime }));
+  document.documentElement.style.setProperty(`--krizcord-${name}`, `url("${url}")`);
+  document.documentElement.classList.add(`krizcord-has-${name}`);
+  if (st.url) URL.revokeObjectURL(st.url);
+  Object.assign(st, { ref, stamp: res.stamp, url });
+  native().log?.(`tema resmi (${name}) uygulandı:`, ref, res.mime);
+}
+
+function lastEnabled(field) {
+  if (paused) return null;
+  const list = all().filter((t) => isEnabled(t.id) && t[field]);
+  return list.length ? list[list.length - 1][field] : null;
+}
+
 function syncBackground() {
-  if (paused) return applyBackground(null);
-  const withBg = all().filter((t) => isEnabled(t.id) && t.background);
-  applyBackground(withBg.length ? withBg[withBg.length - 1].background : null).catch((e) =>
-    native().log?.("arka plan hatası:", String(e))
-  );
+  const report = (e) => native().log?.("tema medyası hatası:", String(e));
+  applyBackground(lastEnabled("background")).catch(report);
+  for (const name of IMAGE_SLOTS) applySlot(name, lastEnabled(name)).catch(report);
 }
 
 /** Teşhis: Discord'un ana yerleşim iskeleti (büyük kutuların sınıf adları) — temaları gerçek adlara göre ayarlamak için */

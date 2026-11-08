@@ -1248,27 +1248,61 @@ function findAnchorText() {
   return null;
 }
 
+// Yeni ayarlar penceresi (2025+): aside.sidebar > nav[Ayarlar sayfaları] > ul.sublist > li ...
+// "Hesabım" yazısı olmayabilir; bu durumda menünün yapısından ilk normal öğe bulunur.
+const SETTINGS_NAV = 'nav[aria-label="Ayarlar sayfaları"],nav[aria-label="Settings pages"],aside[class*="sidebar_"] nav[class*="nav_"]';
+let navLogged = false;
+
+const textOf = (n) => (n.textContent || "").replace(/\s+/g, " ").trim();
+
+function findStructuralItem() {
+  const nav = [...document.querySelectorAll(SETTINGS_NAV)].find((n) => !n.closest(".kc-overlay"));
+  if (!nav) return null;
+  if (!navLogged) {
+    navLogged = true;
+    const names = [...nav.querySelectorAll("li,[role=tab],[role=button],[role=link]")].map(textOf).filter((t) => t && t.length < 40);
+    native()?.log?.("ayar menüsü öğeleri:", [...new Set(names)].slice(0, 30).join(" | "), "|| yapı:", shortSkeleton(nav, 0, 4).slice(0, 700));
+  }
+  // Tıklanabilir, simgeli/yazılı, en az 3 aynı türde kardeşi olan ilk öğe
+  const cands = nav.querySelectorAll('li,[role="tab"],[role="button"],[role="link"],a');
+  for (const c of cands) {
+    const t = textOf(c);
+    if (!t || t.length > 40 || c.closest(".kc-sidebar-item")) continue;
+    const parent = c.parentElement;
+    if (!parent) continue;
+    const prefix = classPrefix(c);
+    const same = [...parent.children].filter((x) => classPrefix(x) === prefix && textOf(x));
+    if (same.length >= 3) return { item: c, list: parent };
+  }
+  return null;
+}
+
 function injectSidebarEntry() {
   sidebarTimer = null;
   if (document.querySelector(".kc-sidebar-item")) return;
-  const text = findAnchorText();
-  if (!text) return;
-
-  // Metinden yukarı çık: kardeşleriyle aynı türde (aynı sınıf önekli) olan menü öğesini bul
-  let item = text.parentElement;
+  let item = null;
   let list = null;
-  for (let i = 0; item && i < 8; i++, item = item.parentElement) {
-    const parent = item.parentElement;
-    if (!parent) break;
-    const prefix = classPrefix(item);
-    const same = [...parent.children].filter((c) => classPrefix(c) === prefix);
-    if (parent.children.length >= 4 && same.length >= 3) {
-      list = parent;
-      break;
+  const text = findAnchorText();
+  if (text) {
+    // Metinden yukarı çık: kardeşleriyle aynı türde (aynı sınıf önekli) olan menü öğesini bul
+    item = text.parentElement;
+    for (let i = 0; item && i < 8; i++, item = item.parentElement) {
+      const parent = item.parentElement;
+      if (!parent) break;
+      const prefix = classPrefix(item);
+      const same = [...parent.children].filter((c) => classPrefix(c) === prefix);
+      if (parent.children.length >= 4 && same.length >= 3) {
+        list = parent;
+        break;
+      }
     }
   }
   if (!list || !item) {
-    if (!sidebarFailLogged) {
+    const found = findStructuralItem();
+    if (found) ({ item, list } = found);
+  }
+  if (!list || !item) {
+    if (text && !sidebarFailLogged) {
       sidebarFailLogged = true;
       let chain = [];
       for (let n = text.parentElement, i = 0; n && i < 8; n = n.parentElement, i++) chain.push(shortSkeleton(n, 0, 0));
@@ -1286,7 +1320,13 @@ function injectSidebarEntry() {
   clone.classList.add("kc-sidebar-item");
   // Metni değiştir
   const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (ANCHOR_TEXTS.has(n.nodeValue.trim()) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP) });
-  const label = walker.nextNode();
+  let label = walker.nextNode();
+  if (!label) {
+    const any = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP) });
+    label = any.nextNode();
+    // geri kalan yazıları (rozet, sayaç vb.) temizle
+    for (let n = any.nextNode(); n; n = any.nextNode()) n.nodeValue = "";
+  }
   if (label) label.nodeValue = BRAND.name;
   else clone.textContent = BRAND.name;
   // Varsa Discord'un simgesini Krizcord simgesiyle değiştir
