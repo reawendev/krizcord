@@ -34,8 +34,8 @@ export default {
     colored: { type: "boolean", label: "Duruma göre renklendir", default: true },
   },
 
-  start(ctx) {
-    if (!ctx.discord.PresenceStore()) throw new Error("Durum bilgisi modülü bulunamadı (Discord güncellenmiş olabilir)");
+  async start(ctx) {
+    if (!ctx.discord.PresenceStore() && !(await ctx.discord.waitFor(ctx.discord.PresenceStore))) throw new Error("Durum bilgisi modülü bulunamadı (Discord güncellenmiş olabilir)");
     ctx.css(CSS);
 
     const signature = (status) =>

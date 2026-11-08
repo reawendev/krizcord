@@ -28,7 +28,8 @@ export function define(def, source = "builtin") {
 
 function isEnabled(entry) {
   const saved = settings.get().plugins[entry.def.name];
-  return saved ? !!saved.enabled : !!entry.def.enabledByDefault;
+  // Kayıtta "enabled" yoksa (ör. yalnızca ayar değiştirildiyse) eklentinin varsayılanı geçerlidir.
+  return saved && "enabled" in saved ? !!saved.enabled : !!entry.def.enabledByDefault;
 }
 
 function pluginSettings(name) {
@@ -38,8 +39,9 @@ function pluginSettings(name) {
     s[name].options ||= {};
     return s[name].options;
   };
+  const peek = () => settings.get().plugins[name]?.options || {};
   return {
-    get: (key, fallback) => (key in bag() ? bag()[key] : fallback),
+    get: (key, fallback) => (key in peek() ? peek()[key] : fallback), // okurken kayıt oluşturmaz
     set: (key, value) => {
       bag()[key] = value;
       settings.save();

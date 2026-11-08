@@ -273,6 +273,135 @@ ipcMain.handle("krizcord:relaunch", () => {
 });
 ipcMain.on("krizcord:toggle-devtools", (e) => e.sender.toggleDevTools());
 
+// --- İndirme / dosya kaydetme ------------------------------------------------
+// Yalnızca Discord CDN'inden resim indirilir; dosyalar İndirilenler\Krizcord klasörüne yazılır.
+
+const CDN_HOSTS = new Set(["cdn.discordapp.com", "media.discordapp.net"]);
+const safeName = (name, fallback) =>
+  String(name || fallback)
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_")
+    .replace(/^\.+/, "")
+    .slice(0, 120) || fallback;
+
+function downloadsDir() {
+  const dir = path.join(app.getPath("downloads"), "Krizcord");
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function uniquePath(dir, name) {
+  const ext = path.extname(name);
+  const base = name.slice(0, name.length - ext.length);
+  let p = path.join(dir, name);
+  for (let i = 2; fs.existsSync(p) && i < 1000; i++) p = path.join(dir, `${base} (${i})${ext}`);
+  return p;
+}
+
+ipcMain.handle("krizcord:download", async (_e, url, name) => {
+  let u;
+  try {
+    u = new URL(url);
+  } catch {
+    throw new Error("geçersiz adres");
+  }
+  if (u.protocol !== "https:" || !CDN_HOSTS.has(u.hostname)) throw new Error("yalnızca Discord CDN'inden indirilebilir");
+  const res = await electron.net.fetch(u.toString());
+  if (!res.ok) throw new Error("indirilemedi (HTTP " + res.status + ")");
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length > 30 * 1024 * 1024) throw new Error("dosya çok büyük");
+  const file = uniquePath(downloadsDir(), safeName(name, "krizcord-resim.png"));
+  fs.writeFileSync(file, buf);
+  shell.showItemInFolder(file);
+  return file;
+});
+
+ipcMain.handle("krizcord:save-text", (_e, name, text) => {
+  if (typeof text !== "string" || text.length > 20 * 1024 * 1024) throw new Error("geçersiz içerik");
+  const file = uniquePath(downloadsDir(), safeName(name, "krizcord.txt"));
+  fs.writeFileSync(file, text, "utf8");
+  shell.showItemInFolder(file);
+  return file;
+});
+
+// --- Mesaj arşivi (kalıcı) -----------------------------------------------------
+
+const ARCHIVE_FILE = path.join(DATA_DIR, "archive.json");
+ipcMain.handle("krizcord:archive-get", () => {
+  const list = readJson(ARCHIVE_FILE, []);
+  return Array.isArray(list) ? list : [];
+});
+ipcMain.handle("krizcord:archive-set", (_e, list) => {
+  if (!Array.isArray(list) || list.length > 10000) throw new Error("geçersiz arşiv");
+  const text = JSON.stringify(list);
+  if (text.length > 20 * 1024 * 1024) throw new Error("arşiv çok büyük");
+  fs.writeFileSync(ARCHIVE_FILE + ".tmp", text);
+  fs.renameSync(ARCHIVE_FILE + ".tmp", ARCHIVE_FILE);
+  return true;
+});
+
+// --- Tema dosyaları ------------------------------------------------------------
+
+function themePath(file) {
+  const base = path.basename(String(file || ""));
+  if (!/^[^<>:"/\\|?*]{1,100}\.css$/i.test(base)) throw new Error("geçersiz tema dosya adı");
+  return path.join(THEMES_DIR, base);
+}
+
+ipcMain.handle("krizcord:theme-save", (_e, name, css) => {
+  if (typeof css !== "string" || css.length > 2 * 1024 * 1024) throw new Error("tema 2 MB'tan büyük olamaz");
+  let base = safeName(String(name || "tema").replace(/\.css$/i, ""), "tema") + ".css";
+  const file = uniquePath(THEMES_DIR, base);
+  fs.writeFileSync(file, css, "utf8");
+  return path.basename(file);
+});
+
+ipcMain.handle("krizcord:theme-delete", async (_e, file) => {
+  const p = themePath(file);
+  if (!fs.existsSync(p)) return false;
+  try {
+    await shell.trashItem(p); // geri dönüşüm kutusuna
+  } catch {
+    fs.unlinkSync(p);
+  }
+  return true;
+});
+
+ipcMain.handle("krizcord:theme-open", (_e, file) => shell.openPath(themePath(file)));
+
+ipcMain.handle("krizcord:theme-fetch", async (_e, url) => {
+  let u;
+  try {
+    u = new URL(String(url).trim());
+  } catch {
+    throw new Error("geçersiz adres");
+  }
+  if (u.protocol !== "https:") throw new Error("yalnızca https adresleri");
+  // github.com/kullanici/repo/blob/dal/yol.css → ham dosya
+  const blob = /^\/([^/]+)\/([^/]+)\/blob\/(.+)$/.exec(u.pathname);
+  if (u.hostname === "github.com" && blob) u = new URL(`https://raw.githubusercontent.com/${blob[1]}/${blob[2]}/${blob[3]}`);
+  const res = await electron.net.fetch(u.toString(), { headers: { "User-Agent": "Krizcord" } });
+  if (!res.ok) throw new Error("indirilemedi (HTTP " + res.status + ")");
+  const text = await res.text();
+  if (text.length > 2 * 1024 * 1024) throw new Error("tema 2 MB'tan büyük olamaz");
+  if (/<html[\s>]/i.test(text.slice(0, 2000))) throw new Error("bu adres bir CSS dosyası değil (sayfa döndü)");
+  return { css: text, name: decodeURIComponent(path.basename(u.pathname)) || "tema.css" };
+});
+
+// Tema klasörü değişince (dosya düzenlendi/eklendi) açık pencerelere haber ver: canlı yenileme
+let themeWatchTimer = null;
+try {
+  fs.watch(THEMES_DIR, () => {
+    clearTimeout(themeWatchTimer);
+    themeWatchTimer = setTimeout(() => {
+      for (const w of electron.BrowserWindow.getAllWindows()) {
+        if (!w.isDestroyed() && origPreloads.has(w.webContents.id)) w.webContents.send("krizcord:themes-changed");
+      }
+    }, 250);
+  });
+} catch (err) {
+  log("tema klasörü izlenemiyor:", err);
+}
+
 app.whenReady().then(() => {
   log("Krizcord sürümü:", VERSION);
   setTimeout(() => checkForUpdates(), 15 * 1000);

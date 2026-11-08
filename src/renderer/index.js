@@ -95,7 +95,8 @@ async function boot() {
     plugins,
     ui,
     badges,
-    circle: { register: circle.register, unregister: circle.unregister, open: circle.open, close: circle.close },
+    themes,
+    circle: { register: circle.register, unregister: circle.unregister, open: circle.open, close: circle.close, openPoint: circle.openPoint },
     definePlugin: (def) => plugins.define(def, "user"),
   };
 
@@ -106,6 +107,8 @@ async function boot() {
   await domReady();
   await themes.reload();
   ui.mount();
+  themes.watch();
+  themes.onChange(() => ui.refresh());
   circle.install({ toast: (msg) => ui.toast(msg) });
   native().log?.("arayüz yüklendi");
   watchUpdates();
@@ -122,6 +125,7 @@ async function boot() {
     console.error("[Krizcord]", e.message);
   }
   // Teşhis: eklentilerin dayandığı Discord modülleri bulunuyor mu? (krizcord.log'a yazılır)
+  await discord.waitFor(discord.UserStore, 10000);
   const found = Object.entries({
     MessageStore: discord.MessageStore(),
     UserStore: discord.UserStore(),
@@ -129,7 +133,7 @@ async function boot() {
     Dispatcher: discord.Dispatcher(),
     TypingActions: discord.TypingActions(),
   }).map(([k, v]) => `${k}:${v ? "var" : "YOK"}`);
-  native().log?.("modüller:", found.join(" "));
+  native().log?.("modüller:", found.join(" "), "| yüklü modül sayısı:", webpack.moduleCount());
 
   await plugins.loadUserPlugins();
   await plugins.startAll();

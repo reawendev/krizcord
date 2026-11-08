@@ -13,8 +13,8 @@ export default {
   authors: [BRAND.owner],
   enabledByDefault: false,
 
-  start(ctx) {
-    const Typing = ctx.discord.TypingActions();
+  async start(ctx) {
+    const Typing = ctx.discord.TypingActions() || (await ctx.discord.waitFor(ctx.discord.TypingActions, 4000));
     if (Typing) {
       try {
         ctx.patcher.instead(Typing, "startTyping", () => undefined);

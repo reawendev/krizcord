@@ -1,11 +1,13 @@
 {
   "badges": {
-    "kurucu": { "name": "Krizcord Kurucusu", "color": "#f5a623" },
-    "krizcord": { "name": "Krizcord Kullanıcısı", "color": "#7c5cff" }
+    "founder": { "name": "Founder", "description": "Krizcord'un kurucusu", "icon": "founder" },
+    "developer": { "name": "Developer", "description": "Krizcord geliştiricisi", "icon": "developer" },
+    "moderator": { "name": "Moderator", "description": "Krizcord topluluğu moderatörü", "icon": "moderator" },
+    "contributor": { "name": "Contributor", "description": "Krizcord'a katkıda bulundu", "icon": "contributor" },
+    "pioneer": { "name": "Pioneer", "description": "Krizcord'un ilk kullanıcılarından", "icon": "pioneer" },
+    "early": { "name": "Early Supporter", "description": "İlk dönem destekçisi", "icon": "early" }
   },
-  "users": {"1532117171319079132": ["kurucu", "krizcord"]}
-<<<<<<< HEAD
+  "users": {
+    "1532117171319079132": ["founder", "developer"]
+  }
 }
-=======
-}
->>>>>>> 0453fb9 (Yeni panel, çember menü ve otomatik güncelleme)

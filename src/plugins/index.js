@@ -4,6 +4,8 @@ import silentTyping from "./silentTyping";
 import messageLogger from "./messageLogger";
 import platformIndicators from "./platformIndicators";
 import ctrlCopy from "./ctrlCopy";
+import profileViewer from "./profileViewer";
+import messageArchive from "./messageArchive";
 
 const SUFFIX = " • " + BRAND.name;
 
@@ -40,4 +42,4 @@ const marka = {
   },
 };
 
-export default [marka, messageLogger, silentTyping, platformIndicators, ctrlCopy];
+export default [marka, messageArchive, profileViewer, messageLogger, silentTyping, platformIndicators, ctrlCopy];

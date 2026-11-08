@@ -27,8 +27,8 @@ export default {
     logEdits: { type: "boolean", label: "Düzenlemeleri göster", default: true },
   },
 
-  start(ctx) {
-    const D = ctx.discord.Dispatcher();
+  async start(ctx) {
+    const D = ctx.discord.Dispatcher() || (await ctx.discord.waitFor(ctx.discord.Dispatcher));
     if (!D) throw new Error("Discord olay dağıtıcısı bulunamadı (Discord güncellenmiş olabilir)");
     ctx.css(CSS);
 

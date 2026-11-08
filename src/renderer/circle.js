@@ -187,6 +187,10 @@ let state = "closed"; // closed | open | closing
 let closeTimer = null;
 let onToast = null;
 const mouse = { x: innerWidth / 2, y: innerHeight / 2 };
+let lastOpen = null;
+
+/** Çember menünün en son açıldığı nokta (eylemler, altındaki mesajı bulmak için kullanır). */
+export const openPoint = () => lastOpen;
 
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
@@ -223,6 +227,7 @@ async function runItem(a) {
 export function open(x = mouse.x, y = mouse.y) {
   if (state === "open") return;
   teardown();
+  lastOpen = { x, y };
   const list = currentItems();
   const reduce = reducedMotion();
   const pad = SIZE / 2 + ITEM / 2 + 8;
