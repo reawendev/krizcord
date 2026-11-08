@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'" />
+<title>Krizcord Kurulum</title>
+<style>
+  :root { --accent:#7c5cff; --bg:#16171a; --card:#212226; --line:#33353b; --text:#e6e7ea; --mute:#8d919a; --ok:#3ba55d; --err:#f04747; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:28px 28px 20px; background:var(--bg); color:var(--text); font:14px/1.45 "Segoe UI", system-ui, sans-serif; user-select:none; }
+  header { text-align:center; margin-bottom:22px; }
+  .logo { width:64px; height:64px; margin:0 auto 10px; border-radius:18px; background:linear-gradient(135deg,#9a82ff,var(--accent) 55%,#5a3fe0);
+    display:grid; place-items:center; font-size:34px; font-weight:800; color:#fff; box-shadow:0 8px 28px rgba(124,92,255,.4); }
+  h1 { margin:0; font-size:22px; }
+  header p { margin:4px 0 0; color:var(--mute); }
+  h2 { font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--mute); margin:20px 0 8px; font-weight:600; }
+  .channels { display:grid; gap:8px; }
+  .ch { display:flex; align-items:center; gap:12px; padding:12px 14px; background:var(--card); border:2px solid transparent; border-radius:10px; cursor:pointer; }
+  .ch.sel { border-color:var(--accent); }
+  .ch.off { opacity:.45; cursor:not-allowed; }
+  .dot { width:10px; height:10px; border-radius:50%; background:#555; flex:none; }
+  .dot.on { background:var(--ok); }
+  .ch .name { font-weight:600; }
+  .ch .meta { color:var(--mute); font-size:12px; }
+  .grow { flex:1; }
+  .tag { font-size:11px; padding:2px 8px; border-radius:99px; background:var(--line); color:var(--mute); }
+  .tag.ok { background:rgba(59,165,93,.18); color:var(--ok); }
+  label.opt { display:flex; align-items:center; gap:8px; margin:6px 0; cursor:pointer; color:#c9ccd2; }
+  input[type=checkbox] { accent-color:var(--accent); width:16px; height:16px; }
+  .btns { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:16px; }
+  button { padding:11px 8px; border:none; border-radius:8px; font-weight:600; font-size:14px; font-family:inherit; cursor:pointer; color:#fff; background:#3c3e45; }
+  button:hover:not(:disabled) { filter:brightness(1.15); }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  button.primary { background:var(--accent); }
+  button.danger { background:#a63a3a; }
+  #log { margin-top:18px; height:150px; overflow:auto; background:#101113; border:1px solid var(--line); border-radius:8px; padding:10px 12px;
+    font:12px/1.5 Consolas, monospace; user-select:text; }
+  #log .ok { color:var(--ok); } #log .err { color:var(--err); } #log .info { color:var(--mute); }
+  footer { margin-top:12px; text-align:center; color:var(--mute); font-size:11px; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo">K</div>
+    <h1>Krizcord Kurulum</h1>
+    <p>Discord'unu eklenti ve temalarla güçlendir</p>
+  </header>
+
+  <h2>Discord sürümü</h2>
+  <div class="channels" id="channels"></div>
+
+  <h2>Seçenekler</h2>
+  <label class="opt"><input type="checkbox" id="kill" checked /> Discord açıksa otomatik kapat</label>
+  <label class="opt"><input type="checkbox" id="launch" checked /> İşlem bitince Discord'u aç</label>
+
+  <div class="btns">
+    <button class="primary" id="btn-install">Kur</button>
+    <button id="btn-repair">Onar</button>
+    <button class="danger" id="btn-uninstall">Kaldır</button>
+  </div>
+
+  <div id="log"></div>
+  <footer>Discord güncellenince "Onar"a bas. İstemci modları Discord Hizmet Şartları'na aykırıdır; sorumluluk sende.</footer>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let channels = [];
+  let selected = null;
+  let busy = false;
+
+  function log(text, cls = "info") {
+    const line = document.createElement("div");
+    line.className = cls;
+    line.textContent = text;
+    $("log").appendChild(line);
+    $("log").scrollTop = $("log").scrollHeight;
+  }
+
+  function render() {
+    const box = $("channels");
+    box.replaceChildren();
+    for (const c of channels) {
+      const row = document.createElement("div");
+      row.className = "ch" + (c.found ? "" : " off") + (selected === c.key ? " sel" : "");
+      const dot = Object.assign(document.createElement("span"), { className: "dot" + (c.found ? " on" : "") });
+      const info = document.createElement("div");
+      info.className = "grow";
+      const name = Object.assign(document.createElement("div"), { className: "name", textContent: c.label });
+      const meta = Object.assign(document.createElement("div"), {
+        className: "meta",
+        textContent: c.found ? "Sürüm " + c.version : "Bulunamadı",
+      });
+      info.append(name, meta);
+      const tag = Object.assign(document.createElement("span"), {
+        className: "tag" + (c.installed ? " ok" : ""),
+        textContent: !c.found ? "—" : c.installed ? "Krizcord kurulu" : "Kurulu değil",
+      });
+      row.append(dot, info, tag);
+      if (c.found) row.addEventListener("click", () => { selected = c.key; render(); });
+      box.appendChild(row);
+    }
+    const cur = channels.find((c) => c.key === selected);
+    $("btn-install").disabled = busy || !cur;
+    $("btn-repair").disabled = busy || !cur || !cur.installed;
+    $("btn-uninstall").disabled = busy || !cur || !cur.installed;
+  }
+
+  async function refresh() {
+    channels = await window.installer.status();
+    if (!channels.find((c) => c.key === selected && c.found)) {
+      const first = channels.find((c) => c.found);
+      selected = first ? first.key : null;
+    }
+    render();
+  }
+
+  async function run(kind) {
+    if (busy || !selected) return;
+    busy = true; render();
+    const opts = { kill: $("kill").checked };
+    const label = channels.find((c) => c.key === selected).label;
+    log(`${label}: ${kind === "uninstall" ? "kaldırılıyor" : "kuruluyor"}...`);
+    const res = kind === "uninstall"
+      ? await window.installer.uninstall(selected, opts)
+      : await window.installer.install(selected, opts);
+    if (res.ok) {
+      log(kind === "uninstall" ? "✔ Krizcord kaldırıldı." : "✔ Krizcord kuruldu.", "ok");
+      if (kind !== "uninstall") log("Panel: Ctrl+Shift+K veya Kullanıcı Ayarları > Krizcord", "info");
+      if ($("launch").checked) {
+        const l = await window.installer.launch(selected);
+        l.ok ? log("Discord açılıyor...", "info") : log("✖ " + l.error, "err");
+      }
+    } else {
+      log("✖ " + res.error, "err");
+    }
+    busy = false;
+    await refresh();
+  }
+
+  $("btn-install").addEventListener("click", () => run("install"));
+  $("btn-repair").addEventListener("click", () => run("install"));
+  $("btn-uninstall").addEventListener("click", () => run("uninstall"));
+
+  refresh().then(() => log("Hazır. Bir Discord sürümü seçip Kur'a bas."));
+</script>
+</body>
+</html>

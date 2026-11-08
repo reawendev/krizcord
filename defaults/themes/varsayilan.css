@@ -1,0 +1,14 @@
+/* Krizcord varsayılan teması.
+   Bu dosyayı düzenleyebilir veya yanına yeni .css dosyaları ekleyebilirsin. */
+
+/* Kaydırma çubuğu vurgusu */
+::-webkit-scrollbar-thumb {
+  background-color: var(--krizcord-accent, #7c5cff) !important;
+  border-radius: 8px;
+}
+
+/* Metin seçimi */
+::selection {
+  background: var(--krizcord-accent, #7c5cff);
+  color: #fff;
+}

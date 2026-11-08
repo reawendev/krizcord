@@ -1,0 +1,44 @@
+{
+  "name": "krizcord-installer",
+  "version": "0.1.0",
+  "description": "Krizcord Kurulum",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "prepare-files": "node scripts/prepare.js",
+    "start": "node scripts/prepare.js && electron .",
+    "build": "node scripts/prepare.js && electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "dev.krizcord.installer",
+    "productName": "Krizcord Kurulum",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "lib/**"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources"
+      }
+    ],
+    "win": {
+      "target": "portable"
+    },
+    "portable": {
+      "artifactName": "Krizcord-Kurulum.exe"
+    }
+  },
+  "dependencies": {
+    "krizcord": "file:.."
+  }
+}

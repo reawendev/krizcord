@@ -1,0 +1,18 @@
+{
+  "name": "krizcord",
+  "version": "0.1.0",
+  "description": "Krizcord - sıfırdan yazılmış Discord istemci modu",
+  "private": true,
+  "repository": "github:reawendev/krizcord",
+  "scripts": {
+    "build": "node build.js",
+    "kur": "node installer/cli.js kur",
+    "kaldir": "node installer/cli.js kaldir",
+    "durum": "node installer/cli.js durum",
+    "installer": "npm --prefix installer-app install && npm --prefix installer-app start",
+    "installer:build": "npm --prefix installer-app install && npm --prefix installer-app run build"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}
