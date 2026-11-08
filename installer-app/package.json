@@ -16,10 +16,29 @@
   "build": {
     "appId": "dev.krizcord.installer",
     "productName": "Krizcord Kurulum",
-    "directories": { "output": "release" },
-    "files": ["main.js", "preload.js", "index.html", "lib/**"],
-    "extraResources": [{ "from": "resources", "to": "resources" }],
-    "win": { "target": "portable" },
-    "portable": { "artifactName": "Krizcord-Kurulum.exe" }
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "lib/**"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources"
+      }
+    ],
+    "win": {
+      "target": "portable"
+    },
+    "portable": {
+      "artifactName": "Krizcord-Kurulum.exe"
+    }
+  },
+  "dependencies": {
+    "krizcord": "file:.."
   }
 }
