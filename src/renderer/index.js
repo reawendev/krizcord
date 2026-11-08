@@ -6,6 +6,7 @@ import * as themes from "./themes";
 import * as ui from "./ui";
 import * as badges from "./badges";
 import * as circle from "./circle";
+import * as discord from "./discord";
 import { t } from "./i18n";
 import { VERSION, BRAND } from "./brand";
 import builtinPlugins from "../plugins/index";
@@ -120,6 +121,16 @@ async function boot() {
   } catch (e) {
     console.error("[Krizcord]", e.message);
   }
+  // Teşhis: eklentilerin dayandığı Discord modülleri bulunuyor mu? (krizcord.log'a yazılır)
+  const found = Object.entries({
+    MessageStore: discord.MessageStore(),
+    UserStore: discord.UserStore(),
+    PresenceStore: discord.PresenceStore(),
+    Dispatcher: discord.Dispatcher(),
+    TypingActions: discord.TypingActions(),
+  }).map(([k, v]) => `${k}:${v ? "var" : "YOK"}`);
+  native().log?.("modüller:", found.join(" "));
+
   await plugins.loadUserPlugins();
   await plugins.startAll();
 

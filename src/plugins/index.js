@@ -1,11 +1,16 @@
 // Yerleşik eklentiler.
 import { BRAND } from "../renderer/brand";
+import silentTyping from "./silentTyping";
+import messageLogger from "./messageLogger";
+import platformIndicators from "./platformIndicators";
+import ctrlCopy from "./ctrlCopy";
 
 const SUFFIX = " • " + BRAND.name;
 
 const marka = {
   name: "Marka",
   description: "Krizcord vurgu rengini uygular ve pencere başlığına marka ekler.",
+  icon: "sparkles",
   authors: [BRAND.owner],
   enabledByDefault: true,
   _style: null,
@@ -35,20 +40,4 @@ const marka = {
   },
 };
 
-const webpackTesti = {
-  name: "Webpack Testi",
-  description: "Discord modüllerine erişimi doğrular ve konsola yazar (geliştirici örneği).",
-  authors: [BRAND.owner],
-  enabledByDefault: false,
-  start(ctx) {
-    const UserStore = ctx.webpack.findByProps("getCurrentUser", "getUser");
-    if (!UserStore) {
-      ctx.log("UserStore bulunamadı - Discord güncellenmiş olabilir.");
-      return;
-    }
-    const me = UserStore.getCurrentUser?.();
-    ctx.log("Webpack erişimi çalışıyor. Giriş yapan kullanıcı:", me?.username ?? "(bilinmiyor)");
-  },
-};
-
-export default [marka, webpackTesti];
+export default [marka, messageLogger, silentTyping, platformIndicators, ctrlCopy];

@@ -7,7 +7,7 @@ import * as themes from "./themes";
 import * as badges from "./badges";
 import * as circle from "./circle";
 import { VERSION, BRAND } from "./brand";
-import { svg } from "./icons";
+import { svg, has } from "./icons";
 
 const native = () => window.KrizcordNative;
 
@@ -162,6 +162,12 @@ a.kc-row:focus-visible,button.kc-row:focus-visible{outline:2px solid var(--kc-pr
 .kc-row-sub{margin-top:2px;font-size:12.5px;color:var(--kc-muted-fg);overflow:hidden;text-overflow:ellipsis}
 .kc-row-err{margin-top:4px;font-size:12px;color:var(--kc-danger)}
 .kc-row-err[hidden]{display:none}
+.kc-opts{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:10px}
+.kc-opts[hidden]{display:none}
+.kc-opt{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--kc-fg);cursor:pointer}
+.kc-opt .kc-switch{width:28px;height:16px}
+.kc-opt .kc-switch::after{width:12px;height:12px}
+.kc-opt .kc-switch:checked::after{transform:translateX(12px)}
 .kc-row-right{display:flex;align-items:center;gap:8px;flex:none;color:var(--kc-muted-fg)}
 .kc-tag{font-size:10.5px;font-weight:500;padding:1px 7px;border-radius:999px;border:1px solid var(--kc-border);color:var(--kc-muted-fg)}
 .kc-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:32px 20px;color:var(--kc-muted-fg);font-size:13px}
@@ -528,17 +534,32 @@ function pluginRow(p) {
         const cur = plugins.list().find((x) => x.name === p.name);
         err.textContent = errText(cur?.error);
         err.hidden = !cur?.error;
+        if (opts) opts.hidden = !on;
         syncNav();
       },
       p.name
     );
+  // Eklenti ayarları: eklenti açıkken altında küçük anahtarlar olarak görünür.
+  const opts =
+    p.options.length > 0 &&
+    el(
+      "div",
+      { class: "kc-opts" },
+      p.options.map((o) =>
+        el("label", { class: "kc-opt" },
+          switchEl(!!o.value, (v) => plugins.setOption(p.name, o.key, v), o.label),
+          el("span", {}, o.label))
+      )
+    );
+  if (opts) opts.hidden = !p.enabled;
   const by = p.source !== "builtin" && p.authors.length ? ` · ${p.authors.join(", ")}` : "";
   return row({
+    icon: p.icon && has(p.icon) ? p.icon : null,
     letter: initial(p.name),
     title: p.name,
     tag: p.source === "builtin" ? t("plugins.builtin") : t("plugins.user"),
     sub: (p.description || "") + by,
-    err,
+    err: [err, opts],
     right: sw,
   });
 }
@@ -667,7 +688,7 @@ function circlePage() {
     });
     checks.push({ box, id: a.id });
     return row({
-      icon: a.kind === "plugin" ? null : a.icon || "zap",
+      icon: a.kind === "plugin" ? (a.icon && has(a.icon) ? a.icon : null) : a.icon || "zap",
       letter: a.kind === "plugin" ? a.letter : null,
       title: a.label,
       sub: a.kind === "plugin" ? t("circle.kindPlugin") : t("circle.kindAction"),

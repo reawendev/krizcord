@@ -72,6 +72,7 @@ export function allActions() {
       id: "plugin:" + p.name,
       label: p.name,
       kind: "plugin",
+      icon: p.icon || null,
       letter: (Array.from(p.name.trim())[0] || "?").toLocaleUpperCase("tr"),
       active: () => !!plugins.list().find((x) => x.name === p.name)?.enabled,
       run: async () => {

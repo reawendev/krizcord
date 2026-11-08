@@ -46,13 +46,36 @@ function ensureHook(obj, key) {
   Object.assign(patched, current);
   patched[HOOK] = state;
   patched.toString = () => state.orig.toString();
-  obj[key] = patched;
+  assign(obj, key, patched);
   return state;
+}
+
+// Bazı modül çıktıları salt-okunur (yalnızca getter). Önce normal atama, olmazsa defineProperty denenir;
+// ikisi de olmazsa sessizce başarısız olmak yerine hata fırlatılır.
+function assign(obj, key, value) {
+  try {
+    obj[key] = value;
+  } catch {
+    /* aşağıda tekrar denenir */
+  }
+  if (obj[key] === value) return;
+  try {
+    Object.defineProperty(obj, key, { value, writable: true, configurable: true, enumerable: true });
+  } catch {
+    /* aşağıda kontrol edilir */
+  }
+  if (obj[key] !== value) throw new Error(`"${String(key)}" yamalanamadı (salt-okunur)`);
 }
 
 function restoreIfEmpty(obj, key, state) {
   if (!state.before.size && !state.after.size && !state.instead.size) {
-    if (obj[key] && obj[key][HOOK] === state) obj[key] = state.orig;
+    if (obj[key] && obj[key][HOOK] === state) {
+      try {
+        assign(obj, key, state.orig);
+      } catch {
+        /* geri alınamadıysa kanca boş kalır, zararsız */
+      }
+    }
   }
 }
 
