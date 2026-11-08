@@ -1,6 +1,6 @@
 {
   "name": "krizcord",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Krizcord - sıfırdan yazılmış Discord istemci modu",
   "private": true,
   "repository": "github:reawendev/krizcord",
