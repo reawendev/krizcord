@@ -30,6 +30,17 @@ const native = {
   setAutoUpdate: (on) => ipcRenderer.invoke("krizcord:set-auto-update", !!on),
   relaunch: () => ipcRenderer.invoke("krizcord:relaunch"),
   toggleDevTools: () => ipcRenderer.send("krizcord:toggle-devtools"),
+  download: (url, name) => ipcRenderer.invoke("krizcord:download", String(url), String(name || "")),
+  saveText: (name, text) => ipcRenderer.invoke("krizcord:save-text", String(name), String(text)),
+  archiveGet: () => ipcRenderer.invoke("krizcord:archive-get"),
+  archiveSet: (list) => ipcRenderer.invoke("krizcord:archive-set", list),
+  themeSave: (name, css) => ipcRenderer.invoke("krizcord:theme-save", String(name), String(css)),
+  themeDelete: (file) => ipcRenderer.invoke("krizcord:theme-delete", String(file)),
+  themeOpen: (file) => ipcRenderer.invoke("krizcord:theme-open", String(file)),
+  themeFetch: (url) => ipcRenderer.invoke("krizcord:theme-fetch", String(url)),
+  onThemesChanged: (cb) => {
+    ipcRenderer.on("krizcord:themes-changed", () => cb());
+  },
   log: (...a) => ipcRenderer.send("krizcord:log", "renderer", ...a.map(String)),
 };
 

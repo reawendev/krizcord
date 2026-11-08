@@ -214,6 +214,13 @@ a.kc-row:focus-visible,button.kc-row:focus-visible{outline:2px solid var(--kc-pr
 .kc-status{display:inline-flex;align-items:center;gap:6px;font-size:12px}
 .kc-status::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
 .kc-status.ok{color:var(--kc-success)} .kc-status.warn{color:#f59e0b} .kc-status.err{color:var(--kc-danger)} .kc-status.idle{color:var(--kc-muted-fg)}
+.kc-swatch{display:grid;grid-template-columns:1fr 1fr;width:32px;height:32px;flex:none;border-radius:8px;overflow:hidden;border:1px solid var(--kc-border)}
+.kc-swatch i{display:block}
+.kc-urlrow{display:flex;gap:8px;align-items:center;padding:14px 20px;border-top:1px solid var(--kc-border)}
+.kc-urlrow .kc-input{flex:1;width:auto}
+.kc-drop{display:flex;align-items:center;justify-content:center;gap:8px;margin:0 0 24px;padding:18px;border-radius:12px;border:1.5px dashed var(--kc-border);
+  color:var(--kc-muted-fg);font-size:12.5px;transition:border-color .15s,background .15s,color .15s}
+.kc-drop.kc-on{border-color:var(--kc-primary);background:color-mix(in srgb,var(--kc-primary) 8%,transparent);color:var(--kc-fg)}
 .kc-notes{white-space:pre-wrap;padding:16px 20px;font-size:12.5px;color:var(--kc-muted-fg);max-height:220px;overflow:auto;user-select:text}
 
 /* Komut paleti */
@@ -341,11 +348,42 @@ const nav = () => [
       { id: "badges", title: t("nav.badges"), icon: "award" },
     ],
   },
+  extraPages.size > 0 && {
+    heading: t("nav.personal"),
+    items: [...extraPages.values()].map((p) => ({ id: p.id, title: p.title, icon: p.icon || "zap", badge: p.badge })),
+  },
   {
     heading: t("nav.system"),
     items: [{ id: "updates", title: t("nav.updates"), icon: "download", badge: () => (updateState.status === "ready" ? "1" : null) }],
   },
-];
+].filter(Boolean);
+
+// --- Eklenti sayfaları -----------------------------------------------------------
+// Eklentiler panele kendi sayfasını ekleyebilir: Krizcord.ui.registerPage({ id, title, icon, render(c) })
+// render, c (bileşenler) ile DOM düğümleri döndürür. Eklenti kapanınca unregisterPage ile kaldırılır.
+const extraPages = new Map();
+
+export function registerPage(page) {
+  if (!page?.id || typeof page.render !== "function") throw new Error("Sayfa için id ve render zorunlu");
+  extraPages.set(page.id, page);
+  if (navScroll) buildSidebar();
+  return () => unregisterPage(page.id);
+}
+
+export function unregisterPage(id) {
+  if (!extraPages.delete(id)) return;
+  if (activeId.split(":")[0] === id) activeId = "overview";
+  if (navScroll) {
+    buildSidebar();
+    if (open) renderContent(false);
+  }
+}
+
+export const refresh = () => {
+  if (!open) return;
+  syncNav();
+  renderContent(false);
+};
 
 const bottomNav = () => [
   { id: "about", title: t("nav.about"), icon: "info" },
@@ -604,24 +642,128 @@ function pluginsPage(filter) {
 
 function themesPage() {
   const items = themes.list();
-  return [
+  const builtin = items.filter((x) => x.builtin);
+  const files = items.filter((x) => !x.builtin);
+  const errBox = el("div", { class: "kc-row-err", style: "margin:0 20px 14px" });
+  errBox.hidden = true;
+  const fail = (e) => {
+    errBox.textContent = String(e?.message || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, "");
+    errBox.hidden = false;
+  };
+  const busy = async (btn, fn) => {
+    btn.disabled = true;
+    errBox.hidden = true;
+    try {
+      await fn();
+    } catch (e) {
+      fail(e);
+      btn.disabled = false;
+      return;
+    }
+    renderContent(false);
+  };
+
+  // Dosyadan yükle (birden fazla .css seçilebilir)
+  const fileInput = el("input", { type: "file", accept: ".css,text/css", multiple: true, style: "display:none" });
+  const importFiles = async (list) => {
+    for (const f of list) {
+      if (!/\.css$/i.test(f.name)) throw new Error(`${f.name}: yalnızca .css dosyaları`);
+      await themes.importText(f.name, await f.text());
+    }
+    if (list.length) toast(`${list.length} tema yüklendi`);
+  };
+  fileInput.addEventListener("change", () => busy(uploadBtn, () => importFiles([...fileInput.files])));
+  const uploadBtn = el("button", { type: "button", class: "kc-btn kc-sm", onclick: () => fileInput.click() }, svg("upload", { size: 14 }), t("themes.fromFile"));
+
+  // URL'den yükle
+  const urlInput = el("input", { type: "url", placeholder: t("themes.urlPlaceholder"), "aria-label": t("themes.fromUrl"), spellcheck: "false" });
+  const urlBtn = el("button", { type: "button", class: "kc-btn kc-sm" }, t("themes.install"));
+  const installUrl = () =>
+    urlInput.value.trim() &&
+    busy(urlBtn, async () => {
+      const file = await themes.importUrl(urlInput.value.trim());
+      toast(`${t("themes.installed")}: ${file}`);
+    });
+  urlBtn.addEventListener("click", installUrl);
+  urlInput.addEventListener("keydown", (e) => e.key === "Enter" && installUrl());
+
+  const swatch = (colors) => el("span", { class: "kc-swatch", "aria-hidden": "true" }, colors.map((c) => {
+    const dot = el("i");
+    dot.style.background = c;
+    return dot;
+  }));
+
+  const themeRow = (th) => {
+    const meta = [th.description, th.author && `${t("themes.by")} ${th.author}`, th.version && `v${th.version}`].filter(Boolean).join(" · ");
+    const actions = !th.builtin && [
+      el("button", { type: "button", class: "kc-iconbtn", title: t("themes.edit"), "aria-label": t("themes.edit"), onclick: () => themes.openInEditor(th.file) }, svg("pencil", { size: 15 })),
+      el("button", {
+        type: "button",
+        class: "kc-iconbtn",
+        title: t("themes.delete"),
+        "aria-label": t("themes.delete"),
+        onclick: (e) => {
+          const b = e.currentTarget;
+          if (b.dataset.confirm !== "1") {
+            b.dataset.confirm = "1";
+            b.style.color = "var(--kc-danger)";
+            b.title = t("themes.deleteConfirm");
+            setTimeout(() => { b.dataset.confirm = ""; b.style.color = ""; b.title = t("themes.delete"); }, 2500);
+            return;
+          }
+          busy(b, async () => {
+            await themes.remove(th.file);
+            toast(t("themes.deleted"));
+          });
+        },
+      }, svg("trash", { size: 15 })),
+    ];
+    return el("div", { class: "kc-row" },
+      th.swatch ? swatch(th.swatch) : el("span", { class: "kc-row-ic", "aria-hidden": "true" }, svg("palette", { size: 16 })),
+      el("div", { class: "kc-row-text" },
+        el("div", { class: "kc-row-title" }, th.name, el("span", { class: "kc-tag" }, th.builtin ? t("plugins.builtin") : th.file)),
+        meta && el("div", { class: "kc-row-sub" }, meta)),
+      el("div", { class: "kc-row-right" }, actions, switchEl(th.enabled, (on) => themes.setEnabled(th.id, on), th.name)));
+  };
+
+  const drop = el("div", { class: "kc-drop" }, svg("upload", { size: 18 }), t("themes.drop"));
+  const page = el("div", {},
     pageHead(t("nav.themes"), t("themes.desc")),
     themes.isPaused() && el("p", { class: "kc-note", style: "margin:-12px 4px 16px" }, t("themes.paused")),
     card(
       {
-        title: t("nav.themes"),
+        title: t("themes.mine"),
         right: el("div", { class: "kc-actions", style: "margin:0" },
-          el("button", { type: "button", class: "kc-btn kc-sm", onclick: () => native().openFolder("themes") }, svg("folderOpen", { size: 14 }), t("themes.openFolder")),
-          el("button", { type: "button", class: "kc-btn kc-sm", onclick: async () => { await themes.reload(); renderContent(false); } }, svg("refreshCw", { size: 14 }), t("themes.reload"))),
+          el("button", { type: "button", class: "kc-btn kc-sm", onclick: (e) => busy(e.currentTarget, () => themes.createNew()) }, svg("filePlus", { size: 14 }), t("themes.new")),
+          uploadBtn,
+          el("button", { type: "button", class: "kc-btn kc-sm", title: t("themes.openFolder"), onclick: () => native().openFolder("themes") }, svg("folderOpen", { size: 14 }))),
       },
-      items.length
-        ? items.map((th) =>
-            row({ icon: "palette", title: th.file.replace(/\.css$/i, ""), sub: `${th.file} · ${t("themes.file")}`, right: switchEl(th.enabled, (on) => themes.setEnabled(th.file, on), th.file) })
-          )
-        : emptyState(t("themes.empty"), "palette")
+      errBox,
+      files.length ? files.map(themeRow) : emptyState(t("themes.empty"), "palette"),
+      el("div", { class: "kc-urlrow" }, el("label", { class: "kc-input" }, svg("link", { size: 14 }), urlInput), urlBtn),
+      fileInput
     ),
+    card({ title: t("themes.builtin"), desc: t("themes.builtinDesc") }, builtin.map(themeRow)),
     el("p", { class: "kc-note" }, t("themes.hint")),
-  ];
+    drop
+  );
+
+  // Sürükle-bırak: panelin herhangi bir yerine .css bırak
+  page.addEventListener("dragover", (e) => {
+    if (![...(e.dataTransfer?.items || [])].some((i) => i.kind === "file")) return;
+    e.preventDefault();
+    drop.classList.add("kc-on");
+  });
+  page.addEventListener("dragleave", (e) => {
+    if (!page.contains(e.relatedTarget)) drop.classList.remove("kc-on");
+  });
+  page.addEventListener("drop", (e) => {
+    e.preventDefault();
+    drop.classList.remove("kc-on");
+    const list = [...(e.dataTransfer?.files || [])];
+    if (list.length) busy(uploadBtn, () => importFiles(list));
+  });
+  return page;
 }
 
 function circlePage() {
@@ -734,7 +876,7 @@ function badgesPage() {
       {},
       row({ icon: "user", title: t("badges.yourId"), sub: el("span", { class: "kc-mono" }, id || t("badges.unknownId")), right: copy }),
       row({
-        img: mine.length ? badges.iconUrl(mine[0].color) : null,
+        img: mine.length ? badges.iconFor(mine[0]) : null,
         icon: mine.length ? null : "award",
         title: t("badges.mine"),
         sub: mine.length ? mine.map((b) => b.name).join(", ") : t("badges.none"),
@@ -746,7 +888,7 @@ function badgesPage() {
         right: el("button", { type: "button", class: "kc-btn kc-sm", onclick: async () => { await badges.refresh(); renderContent(false); } },
           svg("refreshCw", { size: 14 }), `${t("badges.refresh")} · ${badges.holderCount()} ${t("badges.users")}`),
       },
-      defs.length ? defs.map((d) => row({ img: d.iconUrl, title: d.name })) : emptyState(t("badges.typesEmpty"), "award")
+      defs.length ? defs.map((d) => row({ img: d.iconUrl, title: d.name, sub: d.description })) : emptyState(t("badges.typesEmpty"), "award")
     ),
     el("p", { class: "kc-note" }, t("badges.about")),
   ];
@@ -828,6 +970,30 @@ function aboutPage() {
   ];
 }
 
+function extraPage(p, sub) {
+  try {
+    return p.render(components, sub);
+  } catch (e) {
+    console.error("[Krizcord] eklenti sayfası hatası:", e);
+    return [pageHead(p.title), emptyState(String(e?.message || e), "info")];
+  }
+}
+
+// Eklenti sayfalarının kullanabileceği hazır bileşenler (panelle aynı görünüm)
+export const components = {
+  el,
+  svg,
+  card,
+  row,
+  pageHead,
+  switchEl,
+  emptyState,
+  kbds,
+  rerender: () => renderContent(false),
+  go: (id) => go(id),
+  toast: (...a) => toast(...a),
+};
+
 function renderContent(animate) {
   if (!contentEl) return;
   const [base, sub] = activeId.split(":");
@@ -838,6 +1004,7 @@ function renderContent(animate) {
     : base === "badges" ? badgesPage()
     : base === "updates" ? updatesPage()
     : base === "about" ? aboutPage()
+    : extraPages.has(base) ? extraPage(extraPages.get(base), sub)
     : overviewPage();
   const scrollTop = contentEl.scrollTop;
   contentEl.replaceChildren(el("div", { class: "kc-page" + (animate ? " kc-animate" : "") }, page));
@@ -876,9 +1043,9 @@ function paletteEntries() {
     entries.push({
       group: t("palette.themes"),
       icon: "palette",
-      label: th.file.replace(/\.css$/i, ""),
+      label: th.name,
       meta: th.enabled ? t("palette.on") : t("palette.off"),
-      run: () => { themes.setEnabled(th.file, !th.enabled); renderContent(false); },
+      run: () => { themes.setEnabled(th.id, !th.enabled); renderContent(false); },
       keepOpen: true,
     });
   }

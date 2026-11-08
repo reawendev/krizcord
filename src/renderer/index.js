@@ -95,7 +95,8 @@ async function boot() {
     plugins,
     ui,
     badges,
-    circle: { register: circle.register, unregister: circle.unregister, open: circle.open, close: circle.close },
+    themes,
+    circle: { register: circle.register, unregister: circle.unregister, open: circle.open, close: circle.close, openPoint: circle.openPoint },
     definePlugin: (def) => plugins.define(def, "user"),
   };
 
@@ -106,6 +107,8 @@ async function boot() {
   await domReady();
   await themes.reload();
   ui.mount();
+  themes.watch();
+  themes.onChange(() => ui.refresh());
   circle.install({ toast: (msg) => ui.toast(msg) });
   native().log?.("arayüz yüklendi");
   watchUpdates();

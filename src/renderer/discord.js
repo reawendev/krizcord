@@ -36,6 +36,81 @@ export const Dispatcher = () =>
   );
 export const TypingActions = () => cached("typing", () => webpack.findByProps("startTyping", "stopTyping"));
 
+export const ChannelStore = () => cached("channel", () => webpack.findByProps("getChannel", "getDMFromUserId"));
+export const UserProfileStore = () => cached("profile", () => webpack.findByProps("getUserProfile", "getGuildMemberProfile"));
+export const Navigation = () => cached("nav", () => webpack.findByProps("transitionTo", "replaceWith", "getHistory"));
+
+/** Discord içinde bir sayfaya (ör. /channels/guild/kanal/mesaj) sayfayı yenilemeden gider. */
+export function goTo(path) {
+  const nav = Navigation();
+  if (nav?.transitionTo) {
+    try {
+      nav.transitionTo(path);
+      return;
+    } catch {
+      /* yedek yol */
+    }
+  }
+  history.pushState({}, "", path);
+  dispatchEvent(new PopStateEvent("popstate", { state: {} }));
+}
+
+export function getUser(id) {
+  try {
+    return UserStore()?.getUser?.(id) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function guildIdOf(channelId) {
+  try {
+    return ChannelStore()?.getChannel?.(channelId)?.guild_id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+const isAnimated = (hash) => typeof hash === "string" && hash.startsWith("a_");
+
+export function avatarUrl(user, size = 1024) {
+  if (!user?.id) return null;
+  if (user.avatar) return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.${isAnimated(user.avatar) ? "gif" : "png"}?size=${size}`;
+  let index = 0;
+  try {
+    index = Number((BigInt(user.id) >> 22n) % 6n);
+  } catch {
+    /* geç */
+  }
+  return `https://cdn.discordapp.com/embed/avatars/${index}.png`;
+}
+
+export function bannerUrl(userId, size = 2048) {
+  let hash = null;
+  try {
+    hash = UserProfileStore()?.getUserProfile?.(userId)?.banner ?? getUser(userId)?.banner ?? null;
+  } catch {
+    hash = null;
+  }
+  return hash ? `https://cdn.discordapp.com/banners/${userId}/${hash}.${isAnimated(hash) ? "gif" : "png"}?size=${size}` : null;
+}
+
+/** CDN resim adresini en yüksek kaliteye çevirir (boyut 4096, webp yerine png; animasyonluysa gif). */
+export function fullSize(url) {
+  try {
+    const u = new URL(url, location.href);
+    if (!/(^|\.)discordapp\.(com|net)$/.test(u.hostname)) return url;
+    const hash = u.pathname.split("/").pop() || "";
+    const animated = hash.startsWith("a_");
+    u.pathname = u.pathname.replace(/\.(webp|png|jpg|jpeg|gif)$/i, animated ? ".gif" : ".png");
+    u.search = "";
+    if (!u.pathname.startsWith("/embed/")) u.searchParams.set("size", "4096");
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 export function myId() {
   try {
     return UserStore()?.getCurrentUser?.()?.id ?? null;
@@ -91,6 +166,16 @@ export function messageOf(li) {
 
 export function authorOfMessage(li) {
   return messageOf(li)?.author?.id ?? idFromFiber(li);
+}
+
+/** Ekrandaki bir noktanın altındaki mesaj (Krizcord'un kendi katmanları yok sayılır). */
+export function messageAt(x, y) {
+  for (const el of document.elementsFromPoint(x, y)) {
+    if (el.closest(".kc-circle-root,.kc-overlay,.kc-toast")) continue;
+    const li = el.closest('li[id^="chat-messages-"]');
+    if (li) return li;
+  }
+  return null;
 }
 
 export const messageElements = () => document.querySelectorAll('li[id^="chat-messages-"]');
