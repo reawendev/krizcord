@@ -22,7 +22,7 @@ export default {
   authors: [BRAND.owner],
   enabledByDefault: false,
   options: {
-    ignoreSelf: { type: "boolean", label: "Kendi mesajlarımı kaydetme", default: true },
+    ignoreSelf: { type: "boolean", label: "Kendi mesajlarımı kaydetme", default: false },
     ignoreBots: { type: "boolean", label: "Botları yok say", default: false },
     logEdits: { type: "boolean", label: "Düzenlemeleri göster", default: true },
   },
@@ -43,11 +43,17 @@ export default {
         return null;
       }
     };
-    const ignored = (msg) => {
-      if (!msg?.author) return true; // ekranda yüklü değilse gösterecek bir şey yok
-      if (ctx.option("ignoreSelf") && msg.author.id === ctx.discord.myId()) return true;
-      if (ctx.option("ignoreBots") && msg.author.bot) return true;
-      return false;
+    // Teşhis: ilk birkaç silme olayında neden kaydedildiği/yok sayıldığı günlüğe yazılır
+    let diag = 0;
+    const why = (msg) => {
+      if (!msg?.author) return "mesaj bellekte yok (ekranda yüklü değil)";
+      if (ctx.option("ignoreSelf") && msg.author.id === ctx.discord.myId()) return "kendi mesajın (ayar: kendi mesajlarımı kaydetme)";
+      if (ctx.option("ignoreBots") && msg.author.bot) return "bot mesajı (ayar: botları yok say)";
+      return null;
+    };
+    const ignored = (msg) => !!why(msg);
+    const note = (text) => {
+      if (diag++ < 6) ctx.log(text);
     };
 
     const render = () => {
@@ -96,7 +102,12 @@ export default {
 
       if (action.type === "MESSAGE_DELETE") {
         const msg = getMsg(action.channelId, action.id);
-        if (ignored(msg)) return original(...args);
+        const reason = why(msg);
+        if (reason) {
+          note(`silme yok sayıldı: ${reason}`);
+          return original(...args);
+        }
+        note(`silme yakalandı: ${action.channelId}/${action.id}`);
         deleted.set(key(action.channelId, action.id), action);
         renderSoon();
         return Promise.resolve();
@@ -123,6 +134,7 @@ export default {
     });
 
     ctx.onDom(render, 150);
+    ctx.log("olay dağıtıcısı yamalandı");
 
     // Kapatılınca: bekletilen silmeleri Discord'a ilet, ekrandaki işaretleri kaldır.
     ctx.onCleanup(() => {

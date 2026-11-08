@@ -64,7 +64,14 @@ function makeContext(entry) {
     webpack,
     patcher,
     discord,
-    log: (...a) => log(`[${name}]`, ...a),
+    log: (...a) => {
+      log(`[${name}]`, ...a);
+      try {
+        window.KrizcordNative?.log?.(`[${name}]`, ...a.map((x) => (typeof x === "string" ? x : JSON.stringify(x))));
+      } catch {
+        /* geç */
+      }
+    },
     settings: pluginSettings(name),
     option: (key) => optionValue(entry, key),
     toast: (msg) => window.Krizcord?.ui?.toast?.(msg),

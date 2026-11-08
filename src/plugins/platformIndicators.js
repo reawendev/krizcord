@@ -94,6 +94,34 @@ export default {
       }
     };
 
+    // Teşhis (bir kez): ekranda ne bulunduğu ve durum bilgisinin nasıl geldiği
+    setTimeout(() => {
+      try {
+        const ps = ctx.discord.PresenceStore();
+        const lis = ctx.discord.messageElements();
+        const names = lis.filter((li) => li.querySelector('h3 [class*="username"]')).length;
+        const authors = lis.map((li) => ctx.discord.authorOfMessage(li)).filter(Boolean);
+        const rows = ctx.discord.memberRows();
+        const sample = authors.find((id) => id !== ctx.discord.myId()) || rows[0]?.id;
+        const methods = ps ? Object.getOwnPropertyNames(Object.getPrototypeOf(ps)).filter((k) => /client|status|state/i.test(k)).join(",") : "yok";
+        const stateKeys = (() => {
+          try {
+            return Object.keys(ps?.getState?.() || {}).join(",");
+          } catch {
+            return "hata";
+          }
+        })();
+        ctx.log(
+          `teşhis: mesaj=${lis.length} adı-bulunan=${names} yazar-id=${authors.length} üye-satırı=${rows.length}`,
+          `| örnek ${sample}: ${JSON.stringify(sample ? ctx.discord.clientStatus(sample) : null)}`,
+          `| PresenceStore yöntemleri: ${methods} | getState: ${stateKeys}`,
+          `| yerleştirilen simge: ${document.querySelectorAll(".kc-pi").length}`
+        );
+      } catch (e) {
+        ctx.log("teşhis hatası:", String(e));
+      }
+    }, 15000);
+
     ctx.onDom(render, 200);
     ctx.interval(render, 10 * 1000); // durum değişiklikleri DOM'u değiştirmeyebilir
     ctx.onCleanup(() => clear(document));

@@ -86,6 +86,56 @@ function applyAll() {
   syncBackground();
 }
 
+// --- Koruyucu ------------------------------------------------------------------------------
+// Discord <html>'in sınıflarını zaman zaman baştan yazıyor; bizim sınıflarımız (krizcord-has-*) ve
+// arka plan katmanı silinirse geri konur. Resim değişkenleri <html style>'a değil kendi <style>'ımıza yazılır.
+const rootClasses = new Set();
+const rootVars = new Map();
+let guard = null;
+
+function setRootClass(name, on) {
+  if (on) rootClasses.add(name);
+  else rootClasses.delete(name);
+  document.documentElement.classList.toggle(name, on);
+  startGuard();
+}
+
+function varsStyle() {
+  let st = document.getElementById("krizcord-media-vars");
+  if (!st) {
+    st = document.createElement("style");
+    st.id = "krizcord-media-vars";
+    document.head.appendChild(st);
+  }
+  return st;
+}
+
+function setRootVar(name, value) {
+  if (value == null) rootVars.delete(name);
+  else rootVars.set(name, value);
+  varsStyle().textContent = `:root{${[...rootVars].map(([k, v]) => `${k}:${v};`).join("")}}`;
+}
+
+function startGuard() {
+  if (guard) return;
+  const fix = () => {
+    const html = document.documentElement;
+    for (const c of rootClasses) if (!html.classList.contains(c)) html.classList.add(c);
+    if (rootVars.size && !document.getElementById("krizcord-media-vars")) setRootVar("--krizcord-noop", null);
+    const layer = bgLayerEl;
+    if (layer && !layer.isConnected && document.body) {
+      document.body.prepend(layer);
+      layer.querySelector("video")?.play?.().catch(() => {});
+    }
+  };
+  guard = new MutationObserver(fix);
+  guard.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  guard.observe(document.head, { childList: true });
+  if (document.body) guard.observe(document.body, { childList: true });
+}
+
+let bgLayerEl = null;
+
 // --- Arka plan medyası (GIF / video / resim) ----------------------------------------------
 // Etkin temalardan "@background" tanımlayan sonuncusu kullanılır. Medya Discord'un ARKASINA sabit
 // bir katman olarak konur; temanın Discord yüzeylerini saydam yapması gerekir. Tema bu katmanı
@@ -106,6 +156,7 @@ function bgLayer() {
     layer.setAttribute("aria-hidden", "true");
     document.body.prepend(layer);
   }
+  bgLayerEl = layer;
   if (!document.getElementById("krizcord-bg-base")) {
     const st = document.createElement("style");
     st.id = "krizcord-bg-base";
@@ -117,7 +168,8 @@ function bgLayer() {
 
 function clearBackground() {
   document.getElementById("krizcord-bg")?.remove();
-  document.documentElement.classList.remove("krizcord-has-bg");
+  bgLayerEl = null;
+  setRootClass("krizcord-has-bg", false);
   if (bg.url) URL.revokeObjectURL(bg.url);
   bg = { ref: null, stamp: null, url: null };
 }
@@ -147,7 +199,7 @@ async function applyBackground(ref) {
   layer.replaceChildren(el);
   if (bg.url) URL.revokeObjectURL(bg.url);
   bg = { ref, stamp: res.stamp, url };
-  document.documentElement.classList.add("krizcord-has-bg");
+  setRootClass("krizcord-has-bg", true);
   if (isVideo) el.play?.().catch(() => {});
   native().log?.("arka plan uygulandı:", ref, res.mime, `${Math.round(res.data.byteLength / 1024)} KB`);
 }
@@ -169,8 +221,8 @@ const slots = Object.fromEntries(IMAGE_SLOTS.map((n) => [n, { ref: null, stamp: 
 
 function clearSlot(name) {
   const st = slots[name];
-  document.documentElement.style.removeProperty(`--krizcord-${name}`);
-  document.documentElement.classList.remove(`krizcord-has-${name}`);
+  setRootVar(`--krizcord-${name}`, null);
+  setRootClass(`krizcord-has-${name}`, false);
   if (st.url) URL.revokeObjectURL(st.url);
   Object.assign(st, { ref: null, stamp: null, url: null });
 }
@@ -191,8 +243,8 @@ async function applySlot(name, ref) {
     return clearSlot(name);
   }
   const url = URL.createObjectURL(new Blob([res.data], { type: res.mime }));
-  document.documentElement.style.setProperty(`--krizcord-${name}`, `url("${url}")`);
-  document.documentElement.classList.add(`krizcord-has-${name}`);
+  setRootVar(`--krizcord-${name}`, `url("${url}")`);
+  setRootClass(`krizcord-has-${name}`, true);
   if (st.url) URL.revokeObjectURL(st.url);
   Object.assign(st, { ref, stamp: res.stamp, url });
   native().log?.(`tema resmi (${name}) uygulandı:`, ref, res.mime);
