@@ -1,75 +1,66 @@
 /**
  * @name Krizcord Special
- * @description Discord'u baştan aşağı yeniden tasarlar: arkada GIF/video, cam paneller, yeni yazı tipi ve vurgular.
+ * @description Sisli ışık ve siluetler: arkada video, mürekkep siyahı paneller, tek renk vurgu. Hafif ve sade.
  * @author MaliKriz
- * @version 2.0.0
+ * @version 3.0.0
  * @background arkaplan
  */
 
 /*
  * ARKA PLAN
- * "@background arkaplan" satırı, themes klasöründeki arkaplan.mp4 / .webm / .gif / .png / .jpg
- * dosyasını kullanır. Dosyayı o adla klasöre bırakman yeterli; anında uygulanır.
- * İstersen dosya adı yerine doğrudan adres de yazabilirsin:
- *   @background https://ornek.com/video.mp4
- * Arka plan yoksa tema hareketli bir renk geçişine düşer.
+ * "@background arkaplan" satırı themes klasöründeki arkaplan.mp4 / .webm / .gif / .png / .jpg
+ * dosyasını kullanır. Başka bir dosya koymak için aynı adla değiştirmen yeterli.
+ * Adres de yazabilirsin:  @background https://ornek.com/video.mp4
  *
- * AYARLAR — aşağıdaki değerleri değiştirip kaydet, Discord anında güncellenir.
+ * PERFORMANS
+ * Panellerin arkasında canlı bulanıklık (backdrop-filter) YOK: video arkasında en çok GPU harcayan
+ * şey odur. Cam görünümü yalnızca yarı saydam renkle verilir.
+ *
+ * AYARLAR — değiştirip kaydet, Discord anında güncellenir.
  */
 :root {
-  --kc-accent: #8b6cff; /* ana vurgu rengi */
-  --kc-accent-2: #ff5fa2; /* geçişin ikinci rengi */
-  --kc-text: #f2eff9;
-  --kc-muted: #a6a1b8;
+  --kc-ink: 16, 17, 19; /* panellerin rengi (R, G, B) */
+  --kc-panel: 0.74; /* yan panellerin koyuluğu: 0 = saydam, 1 = tam koyu */
+  --kc-chat: 0.42; /* sohbet alanının koyuluğu */
 
-  --kc-glass: rgba(12, 10, 20, 0.5); /* paneller */
-  --kc-glass-chat: rgba(12, 10, 20, 0.36); /* sohbet alanı (daha saydam) */
-  --kc-glass-strong: rgba(16, 14, 26, 0.88); /* menüler, pencereler */
-  --kc-hover: rgba(255, 255, 255, 0.06);
-  --kc-selected: rgba(139, 108, 255, 0.2);
-  --kc-line: rgba(255, 255, 255, 0.08);
+  --kc-light: #ece6e4; /* videodaki ışığın rengi — vurgu olarak kullanılır */
+  --kc-rose: #c9b3ae; /* ikincil, soluk gül kurusu */
+  --kc-text: #ece9e8;
+  --kc-muted: #9a9799;
+  --kc-line: rgba(255, 255, 255, 0.07);
 
-  --kc-blur: 16px; /* cam bulanıklığı — bilgisayar zorlanırsa 0px yap */
-  --kc-radius: 14px;
+  --kc-bg-dim: 0.45; /* videoyu karart: 0 = hiç, 0.8 = çok */
+  --kc-bg-position: center; /* videonun hangi kısmı görünsün: center, left, right, 40% 50% ... */
 
-  --kc-bg-dim: 0.3; /* arka planı karart: 0 = hiç, 0.7 = çok */
-  --kc-bg-blur: 0px; /* arka planın kendisini bulanıklaştır */
-  --kc-bg-saturate: 1.1;
-
-  --kc-font: "Plus Jakarta Sans", "gg sans", "Segoe UI", sans-serif;
+  --kc-radius: 10px;
+  --kc-font: "Inter", "gg sans", "Segoe UI", sans-serif;
 }
 
-@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
 /* ============================================================
-   1. ARKA PLAN KATMANI
+   1. ARKA PLAN
    ============================================================ */
+
+#krizcord-bg {
+  background: #2a2c2f !important;
+}
 
 #krizcord-bg > video,
 #krizcord-bg > img {
-  filter: brightness(calc(1 - var(--kc-bg-dim))) blur(var(--kc-bg-blur)) saturate(var(--kc-bg-saturate));
-  transform: scale(1.02); /* bulanıklıkta kenarlar görünmesin */
+  object-position: var(--kc-bg-position) !important;
+  filter: brightness(calc(1 - var(--kc-bg-dim))) saturate(0.9);
 }
 
-/* Arka plan dosyası yoksa: yavaş hareket eden renk geçişi */
+/* Video yoksa: videonun tonlarında sabit, sade bir ışık */
 html:not(.krizcord-has-bg) body {
   background:
-    radial-gradient(60vw 60vh at 15% 20%, rgba(139, 108, 255, 0.35), transparent 60%),
-    radial-gradient(50vw 50vh at 85% 80%, rgba(255, 95, 162, 0.25), transparent 60%),
-    radial-gradient(70vw 70vh at 70% 10%, rgba(64, 160, 255, 0.18), transparent 60%),
-    #0b0a12 !important;
-  background-size: 140% 140% !important;
-  animation: kc-drift 28s ease-in-out infinite alternate;
-}
-
-@keyframes kc-drift {
-  from { background-position: 0% 0%; }
-  to { background-position: 100% 100%; }
+    radial-gradient(80vw 70vh at 35% 25%, rgba(236, 230, 228, 0.22), transparent 65%),
+    #26282b !important;
 }
 
 /* ============================================================
    2. DISCORD RENK DEĞİŞKENLERİ
-   Taban yüzeyler saydam, paneller cam; menüler ve pencereler koyu cam.
    ============================================================ */
 
 :root,
@@ -78,13 +69,13 @@ html:not(.krizcord-has-bg) body {
 .theme-midnight,
 .visual-refresh,
 .visual-refresh.theme-dark {
-  /* taban — saydam, arkadaki medya görünsün */
+  /* taban yüzeyler saydam — video görünsün */
   --background-base-lowest: transparent !important;
   --background-base-lower: transparent !important;
   --background-base-low: transparent !important;
   --background-tertiary: transparent !important;
   --background-secondary: transparent !important;
-  --background-secondary-alt: rgba(0, 0, 0, 0.18) !important;
+  --background-secondary-alt: rgba(0, 0, 0, 0.2) !important;
   --background-primary: transparent !important;
   --chat-background-default: transparent !important;
   --bg-overlay-chat: transparent !important;
@@ -96,32 +87,32 @@ html:not(.krizcord-has-bg) body {
   --bg-base-tertiary: transparent !important;
   --app-frame-background: transparent !important;
 
-  /* yüzen yüzeyler — okunabilir koyu cam */
-  --background-floating: var(--kc-glass-strong) !important;
-  --background-nested-floating: var(--kc-glass-strong) !important;
-  --background-surface-high: var(--kc-glass-strong) !important;
-  --background-surface-higher: rgba(26, 23, 40, 0.92) !important;
-  --background-surface-highest: rgba(32, 28, 48, 0.94) !important;
-  --modal-background: var(--kc-glass-strong) !important;
-  --modal-footer-background: rgba(0, 0, 0, 0.25) !important;
-  --deprecated-card-bg: rgba(255, 255, 255, 0.04) !important;
-  --card-primary-bg: rgba(255, 255, 255, 0.04) !important;
-  --input-background: rgba(0, 0, 0, 0.3) !important;
-  --channeltextarea-background: rgba(18, 16, 30, 0.62) !important;
+  /* menüler, pencereler, kartlar — düz koyu, okunaklı */
+  --background-floating: #151618 !important;
+  --background-nested-floating: #1a1b1e !important;
+  --background-surface-high: #17181a !important;
+  --background-surface-higher: #1c1d20 !important;
+  --background-surface-highest: #222326 !important;
+  --modal-background: #151618 !important;
+  --modal-footer-background: #111214 !important;
+  --deprecated-card-bg: rgba(255, 255, 255, 0.03) !important;
+  --card-primary-bg: rgba(255, 255, 255, 0.03) !important;
+  --input-background: rgba(0, 0, 0, 0.35) !important;
+  --channeltextarea-background: rgba(var(--kc-ink), 0.72) !important;
 
   /* etkileşim */
-  --background-modifier-hover: var(--kc-hover) !important;
-  --background-modifier-active: var(--kc-selected) !important;
-  --background-modifier-selected: var(--kc-selected) !important;
+  --background-modifier-hover: rgba(255, 255, 255, 0.045) !important;
+  --background-modifier-active: rgba(255, 255, 255, 0.08) !important;
+  --background-modifier-selected: rgba(255, 255, 255, 0.08) !important;
   --background-modifier-accent: var(--kc-line) !important;
-  --background-mod-subtle: var(--kc-hover) !important;
-  --background-mod-normal: var(--kc-selected) !important;
-  --background-mod-strong: rgba(139, 108, 255, 0.28) !important;
-  --background-message-hover: rgba(255, 255, 255, 0.035) !important;
+  --background-mod-subtle: rgba(255, 255, 255, 0.045) !important;
+  --background-mod-normal: rgba(255, 255, 255, 0.08) !important;
+  --background-mod-strong: rgba(255, 255, 255, 0.12) !important;
+  --background-message-hover: rgba(255, 255, 255, 0.03) !important;
   --border-subtle: var(--kc-line) !important;
   --border-faint: var(--kc-line) !important;
-  --border-normal: rgba(255, 255, 255, 0.12) !important;
-  --border-strong: rgba(255, 255, 255, 0.18) !important;
+  --border-normal: rgba(255, 255, 255, 0.1) !important;
+  --border-strong: rgba(255, 255, 255, 0.16) !important;
 
   /* yazı */
   --text-normal: var(--kc-text) !important;
@@ -129,38 +120,34 @@ html:not(.krizcord-has-bg) body {
   --text-strong: #ffffff !important;
   --text-muted: var(--kc-muted) !important;
   --text-subtle: var(--kc-muted) !important;
-  --header-primary: #ffffff !important;
+  --header-primary: #f7f4f3 !important;
   --header-secondary: var(--kc-muted) !important;
   --channels-default: var(--kc-muted) !important;
-  --channel-icon: var(--kc-muted) !important;
-  --interactive-normal: #c4bfd6 !important;
-  --interactive-hover: #ffffff !important;
+  --channel-icon: #7d7a7c !important;
+  --interactive-normal: #b3b0b1 !important;
+  --interactive-hover: #f7f4f3 !important;
   --interactive-active: #ffffff !important;
-  --interactive-muted: rgba(255, 255, 255, 0.28) !important;
-  --text-link: #b7a6ff !important;
+  --interactive-muted: rgba(255, 255, 255, 0.25) !important;
+  --text-link: var(--kc-rose) !important;
 
-  /* vurgu */
-  --brand-260: #d6ccff !important;
-  --brand-360: #a994ff !important;
-  --brand-400: #9a80ff !important;
-  --brand-500: var(--kc-accent) !important;
-  --brand-560: #7657f0 !important;
-  --brand-600: #6847e0 !important;
-  --brand-experiment: var(--kc-accent) !important;
-  --control-brand-foreground: var(--kc-accent) !important;
-  --control-brand-foreground-new: var(--kc-accent) !important;
-  --button-filled-brand-background: var(--kc-accent) !important;
-  --button-filled-brand-background-hover: #7a58ff !important;
-  --button-filled-brand-background-active: #6a49ef !important;
-  --mention-foreground: #d6ccff !important;
-  --mention-background: rgba(139, 108, 255, 0.28) !important;
-  --background-mentioned: rgba(139, 108, 255, 0.12) !important;
-  --background-mentioned-hover: rgba(139, 108, 255, 0.18) !important;
-  --info-warning-foreground: #ffc56a !important;
+  /* vurgu: tek renk, videodaki ışık */
+  --brand-260: #f4efee !important;
+  --brand-360: var(--kc-light) !important;
+  --brand-400: #ddd3d0 !important;
+  --brand-500: #8f8487 !important;
+  --brand-560: #7d7275 !important;
+  --brand-600: #6c6265 !important;
+  --brand-experiment: #8f8487 !important;
+  --control-brand-foreground: var(--kc-light) !important;
+  --control-brand-foreground-new: var(--kc-light) !important;
+  --mention-foreground: #f4efee !important;
+  --mention-background: rgba(236, 230, 228, 0.16) !important;
+  --background-mentioned: rgba(236, 230, 228, 0.06) !important;
+  --background-mentioned-hover: rgba(236, 230, 228, 0.09) !important;
 
-  /* scrollbar */
-  --scrollbar-thin-thumb: rgba(255, 255, 255, 0.16) !important;
-  --scrollbar-auto-thumb: rgba(255, 255, 255, 0.16) !important;
+  /* kaydırma çubuğu */
+  --scrollbar-thin-thumb: rgba(255, 255, 255, 0.14) !important;
+  --scrollbar-auto-thumb: rgba(255, 255, 255, 0.14) !important;
   --scrollbar-thin-track: transparent !important;
   --scrollbar-auto-track: transparent !important;
 
@@ -176,185 +163,135 @@ body,
   -webkit-font-smoothing: antialiased;
 }
 
-/* Discord'un kendi arka plan katmanları saydam olsun */
+/* Discord'un kendi arka plan katmanları saydam */
 #app-mount,
 :is([class^="appMount_"], [class*=" appMount_"]),
 :is([class^="app_"], [class*=" app_"]),
 :is([class^="bg_"], [class*=" bg_"]),
 :is([class^="layers_"], [class*=" layers_"]),
 :is([class^="layer_"], [class*=" layer_"]),
-:is([class^="base_"], [class*=" base_"]),
-:is([class^="content_"], [class*=" content_"]):has(> :is([class^="sidebar_"], [class*=" sidebar_"])) {
+:is([class^="base_"], [class*=" base_"]) {
   background: transparent !important;
 }
 
 /* ============================================================
-   3. CAM PANELLER
+   3. PANELLER — düz, yarı saydam mürekkep; bulanıklık yok
    ============================================================ */
 
-/* Sunucu listesi */
 :is(nav, div):is([class^="guilds_"], [class*=" guilds_"]) {
-  background: var(--kc-glass) !important;
-  backdrop-filter: blur(var(--kc-blur)) saturate(1.3);
+  background: rgba(var(--kc-ink), calc(var(--kc-panel) + 0.08)) !important;
   border-right: 1px solid var(--kc-line) !important;
 }
 
-/* Kanal listesi + kullanıcı paneli */
 :is([class^="sidebar_"], [class*=" sidebar_"]) {
-  background: var(--kc-glass) !important;
-  backdrop-filter: blur(var(--kc-blur)) saturate(1.3);
+  background: rgba(var(--kc-ink), var(--kc-panel)) !important;
   border-right: 1px solid var(--kc-line) !important;
   border-radius: 0 !important;
 }
 
-/* Sohbet */
-:is([class^="chat_"], [class*=" chat_"]),
-:is([class^="chatContent_"], [class*=" chatContent_"]) {
-  background: var(--kc-glass-chat) !important;
-}
 :is([class^="chat_"], [class*=" chat_"]) {
-  backdrop-filter: blur(calc(var(--kc-blur) * 0.6)) saturate(1.2);
+  background: rgba(var(--kc-ink), var(--kc-chat)) !important;
+}
+:is([class^="chatContent_"], [class*=" chatContent_"]) {
+  background: transparent !important;
 }
 
-/* Üye listesi */
-:is([class^="membersWrap_"], [class*=" membersWrap_"]),
 :is([class^="members_"], [class*=" members_"]) {
   background: transparent !important;
 }
 :is([class^="membersWrap_"], [class*=" membersWrap_"]) {
-  background: var(--kc-glass) !important;
-  backdrop-filter: blur(var(--kc-blur)) saturate(1.3);
+  background: rgba(var(--kc-ink), var(--kc-panel)) !important;
   border-left: 1px solid var(--kc-line) !important;
 }
 
 /* Kanal başlığı */
-section:is([class^="title_"], [class*=" title_"]),
-:is([class^="container_"], [class*=" container_"]) > section[aria-label] {
-  background: rgba(10, 8, 18, 0.35) !important;
+section:is([class^="title_"], [class*=" title_"]) {
+  background: rgba(var(--kc-ink), 0.5) !important;
   box-shadow: none !important;
   border-bottom: 1px solid var(--kc-line) !important;
 }
 
-/* Sol alttaki kullanıcı paneli */
+/* Sol alt kullanıcı paneli */
 section:is([class^="panels_"], [class*=" panels_"]) {
-  background: rgba(8, 6, 14, 0.55) !important;
+  background: rgba(0, 0, 0, 0.32) !important;
   border-top: 1px solid var(--kc-line) !important;
-  border-radius: var(--kc-radius) var(--kc-radius) 0 0;
 }
 
-/* Üstteki pencere çubuğu (yeni tasarım) */
+/* Üst pencere çubuğu */
 :is([class^="bar_"], [class*=" bar_"]):has([class*="winButton"], [class*="trailing_"]) {
-  background: rgba(6, 5, 12, 0.45) !important;
-  backdrop-filter: blur(var(--kc-blur));
+  background: rgba(var(--kc-ink), 0.88) !important;
 }
 
 /* ============================================================
-   4. KANAL LİSTESİ VE ÜYELER
+   4. KANALLAR VE ÜYELER
    ============================================================ */
 
-:is([class^="containerDefault_"], [class*=" containerDefault_"]) :is([class^="link_"], [class*=" link_"]),
-:is([class^="link_"], [class*=" link_"]):is([class*="interactive"]) {
-  border-radius: 10px !important;
-  transition: background-color 0.15s ease, transform 0.15s ease;
+:is([class^="containerDefault_"], [class*=" containerDefault_"]) :is([class^="link_"], [class*=" link_"]) {
+  border-radius: 6px !important;
 }
 
-:is([class^="containerDefault_"], [class*=" containerDefault_"]):hover :is([class^="link_"], [class*=" link_"]) {
-  transform: translateX(2px);
-}
-
-/* Seçili kanal: vurgu çubuğu */
+/* Seçili kanal: ince ışık çizgisi */
 :is([class^="containerDefault_"], [class*=" containerDefault_"]) :is([class*="modeSelected_"], [class*="selected_"]) {
-  background: linear-gradient(90deg, rgba(139, 108, 255, 0.28), rgba(139, 108, 255, 0.06)) !important;
-  box-shadow: inset 3px 0 0 var(--kc-accent);
+  background: rgba(255, 255, 255, 0.07) !important;
+  box-shadow: inset 2px 0 0 var(--kc-light);
 }
 
 /* Kategori başlıkları */
-:is([class^="mainContent_"], [class*=" mainContent_"]) h3,
 :is([class^="containerDefault_"], [class*=" containerDefault_"]) h3 {
-  letter-spacing: 0.08em !important;
-  font-weight: 700 !important;
+  letter-spacing: 0.1em !important;
+  font-weight: 600 !important;
+  font-size: 11px !important;
 }
 
-/* Üye satırları */
 :is([class^="member_"], [class*=" member_"]) > div {
-  border-radius: 10px !important;
+  border-radius: 6px !important;
 }
 
 /* ============================================================
    5. MESAJLAR
    ============================================================ */
 
-li[id^="chat-messages-"] > div {
-  border-radius: 12px;
-  margin-inline: 8px;
-  transition: background-color 0.15s ease;
+/* Bahsedildiğin mesajlar: tek ince çizgi */
+li[id^="chat-messages-"] > div[class*="mentioned_"] {
+  background: rgba(236, 230, 228, 0.06) !important;
+}
+li[id^="chat-messages-"] > div[class*="mentioned_"]::before {
+  background: var(--kc-light) !important;
+  width: 2px !important;
 }
 
-li[id^="chat-messages-"] > div:hover {
-  background: rgba(255, 255, 255, 0.04) !important;
-}
-
-/* Bahsedildiğin mesajlar */
-li[id^="chat-messages-"] > div:is([class*="mentioned_"]) {
-  background: linear-gradient(90deg, rgba(139, 108, 255, 0.18), rgba(255, 95, 162, 0.06)) !important;
-}
-li[id^="chat-messages-"] > div:is([class*="mentioned_"])::before {
-  background: linear-gradient(var(--kc-accent), var(--kc-accent-2)) !important;
-  width: 3px !important;
-  border-radius: 3px;
-}
-
-/* Sohbetteki avatarlar: yumuşak kare */
+/* Avatarlar: yumuşak kare */
 li[id^="chat-messages-"] img:is([class^="avatar_"], [class*=" avatar_"]) {
-  border-radius: 32% !important;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.06);
+  border-radius: 30% !important;
 }
 
-/* @bahsetmeler */
-:is([class^="mention"], [class*=" mention"]):is([class*="wrapper_"], [class*="interactive"]) {
-  border-radius: 6px !important;
-  padding: 0 4px !important;
-}
-
-/* Kod blokları */
+/* Kod */
 pre code,
 :is([class^="markup_"], [class*=" markup_"]) code {
-  background: rgba(0, 0, 0, 0.38) !important;
+  background: rgba(0, 0, 0, 0.4) !important;
   border: 1px solid var(--kc-line) !important;
-  border-radius: 10px !important;
+  border-radius: 6px !important;
 }
 
-/* Gömülü içerikler */
-article:is([class^="embedFull_"], [class*=" embedFull_"]),
+/* Gömülü içerik */
 :is([class^="embedFull_"], [class*=" embedFull_"]) {
-  background: rgba(10, 8, 18, 0.5) !important;
-  border-radius: 12px !important;
-  backdrop-filter: blur(8px);
-}
-
-/* Tarih ayırıcı */
-:is([class^="divider_"], [class*=" divider_"]):is([class*="hasContent_"]) span {
-  background: rgba(10, 8, 18, 0.7) !important;
-  border-radius: 999px !important;
-  padding: 2px 10px !important;
+  background: rgba(var(--kc-ink), 0.75) !important;
+  border-radius: 8px !important;
 }
 
 /* ============================================================
-   6. MESAJ YAZMA KUTUSU
+   6. MESAJ KUTUSU
    ============================================================ */
 
 :is([class^="channelTextArea_"], [class*=" channelTextArea_"]) {
-  border-radius: 18px !important;
-  background: rgba(18, 16, 30, 0.62) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  backdrop-filter: blur(var(--kc-blur)) saturate(1.3);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 12px !important;
+  background: rgba(var(--kc-ink), 0.78) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  transition: border-color 0.2s ease;
 }
 
 :is([class^="channelTextArea_"], [class*=" channelTextArea_"]):focus-within {
-  border-color: rgba(139, 108, 255, 0.55) !important;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35), 0 0 0 3px rgba(139, 108, 255, 0.18);
+  border-color: rgba(236, 230, 228, 0.35) !important;
 }
 
 :is([class^="channelTextArea_"], [class*=" channelTextArea_"]) :is([class^="scrollableContainer_"], [class*=" scrollableContainer_"]) {
@@ -362,58 +299,48 @@ article:is([class^="embedFull_"], [class*=" embedFull_"]),
 }
 
 /* ============================================================
-   7. MENÜLER, AÇILIR PENCERELER, PROFİL KARTLARI
+   7. MENÜLER VE AÇILIR PENCERELER — düz, bulanıklık yok
    ============================================================ */
 
 :is([class^="menu_"], [class*=" menu_"]),
 :is([class^="popout_"], [class*=" popout_"]),
 :is([class^="userPopoutOuter_"], [class*=" userPopoutOuter_"]),
 :is([class^="autocomplete_"], [class*=" autocomplete_"]),
-:is([class^="tooltip_"], [class*=" tooltip_"]),
 [role="dialog"] > :is([class^="root_"], [class*=" root_"]) {
-  background: var(--kc-glass-strong) !important;
-  backdrop-filter: blur(20px) saturate(1.4);
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: #151618 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
   border-radius: var(--kc-radius) !important;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.5) !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45) !important;
 }
 
-:is([class^="menu_"], [class*=" menu_"]) [role="menuitem"],
-:is([class^="menu_"], [class*=" menu_"]) [role="menuitemcheckbox"] {
-  border-radius: 8px !important;
+:is([class^="menu_"], [class*=" menu_"]) [role^="menuitem"] {
+  border-radius: 6px !important;
 }
 
-:is([class^="menu_"], [class*=" menu_"]) [role^="menuitem"]:is([class*="focused_"]) {
-  background: var(--kc-accent) !important;
-}
-
-:is([class^="tooltip_"], [class*=" tooltip_"]) {
-  border-radius: 8px !important;
-}
-
-/* Pencere arkası karartma */
-:is([class^="backdrop_"], [class*=" backdrop_"]) {
-  backdrop-filter: blur(6px);
+:is([class^="menu_"], [class*=" menu_"]) [role^="menuitem"][class*="focused_"] {
+  background: var(--kc-light) !important;
+  color: #141517 !important;
 }
 
 /* ============================================================
    8. DÜĞMELER, SEÇİM, KAYDIRMA ÇUBUĞU
    ============================================================ */
 
-button:is([class*="colorBrand_"], [class*="lookFilled_"][class*="colorBrand"]) {
-  background: linear-gradient(135deg, var(--kc-accent), #a45cff) !important;
-  border-radius: 10px !important;
-  transition: filter 0.15s ease, transform 0.1s ease !important;
+/* Ana düğmeler: açık zemin, koyu yazı */
+button[class*="colorBrand_"] {
+  background: var(--kc-light) !important;
+  color: #141517 !important;
+  border-radius: 8px !important;
 }
-button:is([class*="colorBrand_"]):hover {
-  filter: brightness(1.1);
+button[class*="colorBrand_"] * {
+  color: inherit !important;
 }
-button:is([class*="colorBrand_"]):active {
-  transform: scale(0.97);
+button[class*="colorBrand_"]:hover {
+  background: #ffffff !important;
 }
 
 ::selection {
-  background: rgba(139, 108, 255, 0.45);
+  background: rgba(236, 230, 228, 0.3);
   color: #fff;
 }
 
@@ -422,13 +349,13 @@ button:is([class*="colorBrand_"]):active {
   height: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14) !important;
+  background: rgba(255, 255, 255, 0.12) !important;
   border-radius: 8px !important;
   border: 2px solid transparent !important;
   background-clip: padding-box !important;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(139, 108, 255, 0.5) !important;
+  background: rgba(255, 255, 255, 0.24) !important;
   background-clip: padding-box !important;
 }
 ::-webkit-scrollbar-track,
@@ -437,14 +364,8 @@ button:is([class*="colorBrand_"]):active {
   border: none !important;
 }
 
-/* Okunmamış / bildirim rozetleri */
+/* Okunmamış sayacı */
 :is([class^="numberBadge_"], [class*=" numberBadge_"]) {
-  background: linear-gradient(135deg, var(--kc-accent-2), #ff7a59) !important;
-}
-
-/* Hareketi azalt tercih edenler için */
-@media (prefers-reduced-motion: reduce) {
-  html:not(.krizcord-has-bg) body {
-    animation: none;
-  }
+  background: var(--kc-light) !important;
+  color: #141517 !important;
 }
