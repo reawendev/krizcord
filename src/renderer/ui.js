@@ -1217,40 +1217,109 @@ export function toast(message, action) {
 
 // --- Kullanıcı Ayarları kenar çubuğuna "Krizcord" girişi -----------------------
 
+// Discord'un ayar menüsündeki "Hesabım" öğesi bulunur, o öğe kopyalanıp "Krizcord" yapılır ve üstüne eklenir.
+// Böylece görünüm (yazı tipi, üstüne gelme, boşluk) Discord'un kendi menüsüyle birebir aynı olur.
+const ANCHOR_TEXTS = new Set(["Hesabım", "My Account", "Mon compte", "Mein Account", "Mi cuenta", "Моя учётная запись"]);
 let sidebarLogged = false;
+let sidebarFailLogged = false;
 let sidebarTimer = null;
+
+function shortSkeleton(el, depth = 0, max = 3) {
+  if (!el || depth > max) return "";
+  const cls = (typeof el.className === "string" ? el.className : "").split(/\s+/).filter(Boolean).map((c) => c.replace(/_[\w-]{4,}$/, "").replace(/__[\w-]+$/, "")).slice(0, 2).join(".");
+  const role = el.getAttribute?.("role");
+  const self = `${el.tagName.toLowerCase()}${cls ? "." + cls : ""}${role ? `[${role}]` : ""}`;
+  const kids = [...el.children].slice(0, 4).map((c) => shortSkeleton(c, depth + 1, max)).filter(Boolean);
+  return kids.length ? `${self}(${kids.join(",")})` : self;
+}
+
+const classPrefix = (el) => ((typeof el.className === "string" ? el.className : "").split(/\s+/)[0] || el.tagName).replace(/_[\w-]{4,}$/, "");
+
+function findAnchorText() {
+  const scopes = document.querySelectorAll('nav,[role="tablist"],[class*="idebar"],[class*="settings"],[class*="Settings"]');
+  for (const scope of scopes) {
+    if (scope.closest(".kc-overlay")) continue;
+    const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, {
+      acceptNode: (n) => (ANCHOR_TEXTS.has(n.nodeValue.trim()) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP),
+    });
+    const node = walker.nextNode();
+    if (node) return node;
+  }
+  return null;
+}
 
 function injectSidebarEntry() {
   sidebarTimer = null;
-  for (const list of document.querySelectorAll('[role="tablist"]')) {
-    if (list.closest(".kc-overlay")) continue;
-    if (list.querySelector(".kc-sidebar-item")) return;
-    const tabsEls = [...list.querySelectorAll('[role="tab"]')];
-    if (tabsEls.length < 6) continue; // kullanıcı ayarları değil
-    const template = tabsEls.find((n) => n.getAttribute("aria-selected") !== "true") || tabsEls[0];
-    const item = template.cloneNode(true);
-    for (const attr of ["id", "data-list-item-id", "aria-controls", "aria-label", "href"]) item.removeAttribute(attr);
-    item.setAttribute("aria-selected", "false");
-    item.classList.add("kc-sidebar-item");
-    item.style.cursor = "pointer";
-    item.textContent = t("sidebar.entry");
-    item.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      show();
-    });
-    tabsEls[tabsEls.length - 1].before(item);
-    if (!sidebarLogged) {
-      sidebarLogged = true;
-      native()?.log?.("ayar menüsüne giriş eklendi, sekme sayısı:", tabsEls.length);
+  if (document.querySelector(".kc-sidebar-item")) return;
+  const text = findAnchorText();
+  if (!text) return;
+
+  // Metinden yukarı çık: kardeşleriyle aynı türde (aynı sınıf önekli) olan menü öğesini bul
+  let item = text.parentElement;
+  let list = null;
+  for (let i = 0; item && i < 8; i++, item = item.parentElement) {
+    const parent = item.parentElement;
+    if (!parent) break;
+    const prefix = classPrefix(item);
+    const same = [...parent.children].filter((c) => classPrefix(c) === prefix);
+    if (parent.children.length >= 4 && same.length >= 3) {
+      list = parent;
+      break;
+    }
+  }
+  if (!list || !item) {
+    if (!sidebarFailLogged) {
+      sidebarFailLogged = true;
+      let chain = [];
+      for (let n = text.parentElement, i = 0; n && i < 8; n = n.parentElement, i++) chain.push(shortSkeleton(n, 0, 0));
+      native()?.log?.("ayar menüsü: 'Hesabım' bulundu ama menü yapısı tanınmadı:", chain.join(" < "));
     }
     return;
+  }
+
+  const clone = item.cloneNode(true);
+  for (const n of [clone, ...clone.querySelectorAll("*")]) {
+    for (const attr of ["id", "data-list-item-id", "aria-controls", "aria-label", "href", "aria-current"]) n.removeAttribute?.(attr);
+    if (typeof n.className === "string") n.className = n.className.split(/\s+/).filter((c) => !/selected|active/i.test(c)).join(" ");
+    if (n.getAttribute?.("aria-selected") === "true") n.setAttribute("aria-selected", "false");
+  }
+  clone.classList.add("kc-sidebar-item");
+  // Metni değiştir
+  const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (ANCHOR_TEXTS.has(n.nodeValue.trim()) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP) });
+  const label = walker.nextNode();
+  if (label) label.nodeValue = BRAND.name;
+  else clone.textContent = BRAND.name;
+  // Varsa Discord'un simgesini Krizcord simgesiyle değiştir
+  const oldIcon = clone.querySelector("svg");
+  if (oldIcon) {
+    const size = oldIcon.getAttribute("width") || 20;
+    const icon = svg("sparkles", { size: Number(size) || 20, stroke: 2 });
+    icon.style.color = "var(--krizcord-accent,#7c5cff)";
+    oldIcon.replaceWith(icon);
+  }
+  clone.style.cursor = "pointer";
+  clone.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    show();
+  }, true);
+  clone.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      show();
+    }
+  });
+  item.before(clone);
+
+  if (!sidebarLogged) {
+    sidebarLogged = true;
+    native()?.log?.("ayar menüsüne Krizcord sekmesi eklendi. Menü:", shortSkeleton(list, 0, 2).slice(0, 900));
   }
 }
 
 function scheduleSidebar() {
   if (sidebarTimer) return;
-  sidebarTimer = setTimeout(injectSidebarEntry, 300);
+  sidebarTimer = setTimeout(injectSidebarEntry, 350);
 }
 
 // --- Başlat ------------------------------------------------------------

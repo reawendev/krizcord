@@ -125,6 +125,7 @@ async function boot() {
     console.error("[Krizcord]", e.message);
   }
   // Teşhis: eklentilerin dayandığı Discord modülleri bulunuyor mu? (krizcord.log'a yazılır)
+  await discord.waitFor(discord.UserStore, 10000);
   const found = Object.entries({
     MessageStore: discord.MessageStore(),
     UserStore: discord.UserStore(),
@@ -132,7 +133,7 @@ async function boot() {
     Dispatcher: discord.Dispatcher(),
     TypingActions: discord.TypingActions(),
   }).map(([k, v]) => `${k}:${v ? "var" : "YOK"}`);
-  native().log?.("modüller:", found.join(" "));
+  native().log?.("modüller:", found.join(" "), "| yüklü modül sayısı:", webpack.moduleCount());
 
   await plugins.loadUserPlugins();
   await plugins.startAll();

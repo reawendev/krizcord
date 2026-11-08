@@ -5,9 +5,13 @@ import * as webpack from "./webpack";
 
 const SNOWFLAKE = /^\d{15,25}$/;
 const cache = new Map();
+const misses = new Map(); // bulunamayanlar: tam tarama pahalı, 5 sn'de bir tekrar denenir
 
 function cached(key, finder) {
-  if (cache.get(key)) return cache.get(key);
+  const hit = cache.get(key);
+  if (hit) return hit;
+  if (!webpack.wpRequire) return null; // Discord modülleri henüz hazır değil: "bulunamadı" sayma
+  if (Date.now() - (misses.get(key) || 0) < 2000) return null;
   let v = null;
   try {
     v = finder();
@@ -15,30 +19,37 @@ function cached(key, finder) {
     v = null;
   }
   if (v) cache.set(key, v);
+  else misses.set(key, Date.now());
   return v;
 }
 
-export const MessageStore = () => cached("message", () => webpack.findByProps("getMessage", "getMessages"));
-export const UserStore = () => cached("user", () => webpack.findByProps("getCurrentUser", "getUser"));
+// Önce Flux mağazasının adıyla (en sağlam), olmazsa yöntem adlarıyla aranır.
+const store = (name, ...props) => () => cached(name, () => webpack.findStore(name) || webpack.findByProps(...props));
+
+export const MessageStore = store("MessageStore", "getMessage", "getMessages");
+export const UserStore = store("UserStore", "getCurrentUser", "getUser");
 export const PresenceStore = () =>
-  cached("presence", () =>
+  cached("PresenceStore", () =>
+    webpack.findStore("PresenceStore") ||
     webpack.find((m) => typeof m.getStatus === "function" && typeof m.getActivities === "function" && (typeof m.getState === "function" || typeof m.getClientStatus === "function"))
   );
-export const Dispatcher = () =>
-  cached("dispatcher", () =>
-    webpack.find(
-      (m) =>
-        typeof m.dispatch === "function" &&
-        typeof m.subscribe === "function" &&
-        typeof m.unsubscribe === "function" &&
-        ("_actionHandlers" in m || typeof m.isDispatching === "function")
-    )
-  );
-export const TypingActions = () => cached("typing", () => webpack.findByProps("startTyping", "stopTyping"));
+export const ChannelStore = store("ChannelStore", "getChannel", "getDMFromUserId");
+export const UserProfileStore = store("UserProfileStore", "getUserProfile", "getGuildMemberProfile");
 
-export const ChannelStore = () => cached("channel", () => webpack.findByProps("getChannel", "getDMFromUserId"));
-export const UserProfileStore = () => cached("profile", () => webpack.findByProps("getUserProfile", "getGuildMemberProfile"));
+const isDispatcher = (m) =>
+  m && typeof m.dispatch === "function" && typeof m.subscribe === "function" && typeof m.unsubscribe === "function";
+
+// Her Flux mağazası kendi dağıtıcısını _dispatcher alanında tutar; en güvenilir yol bu.
+export const Dispatcher = () =>
+  cached("dispatcher", () => {
+    for (const s of [UserStore(), MessageStore(), ChannelStore()]) if (isDispatcher(s?._dispatcher)) return s._dispatcher;
+    return webpack.find((m) => isDispatcher(m) && ("_actionHandlers" in m || typeof m.isDispatching === "function"));
+  });
+export const TypingActions = () => cached("typing", () => webpack.findByProps("startTyping", "stopTyping"));
 export const Navigation = () => cached("nav", () => webpack.findByProps("transitionTo", "replaceWith", "getHistory"));
+
+/** Bir modül hazır olana kadar bekler (eklentiler açılışta erken başlayabilir). */
+export const waitFor = (getter, ms = 15000) => webpack.waitFor(getter, ms);
 
 /** Discord içinde bir sayfaya (ör. /channels/guild/kanal/mesaj) sayfayı yenilemeden gider. */
 export function goTo(path) {
