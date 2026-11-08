@@ -18,20 +18,31 @@ function cached(key, finder) {
   return v;
 }
 
-export const MessageStore = () => cached("message", () => webpack.findByProps("getMessage", "getMessages"));
+export const MessageStore = () =>
+  cached("message", () =>
+    webpack.find((m) => typeof m.getMessage === "function") ||
+    webpack.find((m) => typeof m.getMessages === "function")
+  );
 export const UserStore = () => cached("user", () => webpack.findByProps("getCurrentUser", "getUser"));
 export const PresenceStore = () =>
   cached("presence", () =>
-    webpack.find((m) => typeof m.getStatus === "function" && typeof m.getActivities === "function" && (typeof m.getState === "function" || typeof m.getClientStatus === "function"))
+    webpack.find(
+      (m) =>
+        typeof m.getClientStatus === "function" ||
+        (typeof m.getState === "function" &&
+          m.getState()?.clientStatuses &&
+          typeof m.getState().clientStatuses === "object")
+    )
   );
 export const Dispatcher = () =>
   cached("dispatcher", () =>
     webpack.find(
       (m) =>
         typeof m.dispatch === "function" &&
-        typeof m.subscribe === "function" &&
-        typeof m.unsubscribe === "function" &&
-        ("_actionHandlers" in m || typeof m.isDispatching === "function")
+        (typeof m.subscribe === "function" ||
+          typeof m.unsubscribe === "function" ||
+          "_actionHandlers" in m ||
+          typeof m.isDispatching === "function")
     )
   );
 export const TypingActions = () => cached("typing", () => webpack.findByProps("startTyping", "stopTyping"));
@@ -75,8 +86,8 @@ export function idFromFiber(el) {
 
 /** li#chat-messages-<kanal>-<mesaj> → { channelId, messageId } */
 export function parseMessageEl(li) {
-  const m = /^chat-messages-(?:[^-]+-)?(\d+)-(\d+)$/.exec(li?.id || "");
-  return m ? { channelId: m[1], messageId: m[2] } : null;
+  const ids = (li?.id || "").match(/\d{15,25}/g);
+  return ids?.length >= 2 ? { channelId: ids.at(-2), messageId: ids.at(-1) } : null;
 }
 
 export function messageOf(li) {

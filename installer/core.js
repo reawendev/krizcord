@@ -101,6 +101,14 @@ function copyIfMissing(srcDir, destDir) {
   }
 }
 
+function updateBuiltInThemes(srcDir, destDir) {
+  const file = "krizcord-special.css";
+  const src = path.join(srcDir, file);
+  if (!fs.existsSync(src)) return;
+  fs.mkdirSync(destDir, { recursive: true });
+  fs.copyFileSync(src, path.join(destDir, file));
+}
+
 // --- Genel API --------------------------------------------------------
 
 function detect(key) {
@@ -133,6 +141,7 @@ function install(key, { distDir, defaultsDir, kill = false }) {
   for (const f of FILES) fs.copyFileSync(path.join(distDir, f), path.join(outDist, f));
   if (defaultsDir) {
     copyIfMissing(path.join(defaultsDir, "themes"), path.join(dataDir(), "themes"));
+    updateBuiltInThemes(path.join(defaultsDir, "themes"), path.join(dataDir(), "themes"));
     copyIfMissing(path.join(defaultsDir, "plugins"), path.join(dataDir(), "plugins"));
   }
 

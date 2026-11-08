@@ -1,0 +1,235 @@
+/*
+ * Krizcord Special
+ * Discord'un güncel class isimleriyle uyumlu, düşük doygunluklu Sakura teması.
+ *
+ * Not: BetterDiscord temalarındaki @import ve özel değişkenler Krizcord'da
+ * otomatik olarak uygulanmaz; bu dosya Discord yüzeylerini doğrudan stiller.
+ */
+
+:root {
+  --kc-sp-bg: #171518;
+  --kc-sp-bg-2: #111013;
+  --kc-sp-panel: rgba(31, 28, 32, 0.9);
+  --kc-sp-panel-soft: rgba(255, 255, 255, 0.045);
+  --kc-sp-border: rgba(255, 214, 226, 0.12);
+  --kc-sp-text: #f5eef1;
+  --kc-sp-muted: #aa9da5;
+  --kc-sp-pink: #e7a5b8;
+  --kc-sp-pink-strong: #d889a4;
+  --kc-sp-shadow: 0 14px 36px rgba(0, 0, 0, 0.25);
+}
+
+/* Discord'un temel katmanları */
+html,
+body,
+#app-mount,
+[class*="appMount"],
+[class*="app_"],
+[class*="bg_"],
+[class*="layer_"],
+[class*="layers_"],
+[class*="base_"] {
+  background-color: var(--kc-sp-bg-2) !important;
+  color: var(--kc-sp-text) !important;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI",
+    sans-serif !important;
+}
+
+[class*="guilds_"],
+[class*="guilds-"],
+[class*="sidebar_"],
+[class*="sidebar-"],
+[class*="privateChannels_"],
+[class*="privateChannels-"],
+[class*="panels_"],
+[class*="panels-"],
+[class*="membersWrap_"],
+[class*="membersWrap-"],
+[class*="members_"],
+[class*="members-"],
+[class*="chat_"],
+[class*="chat-"],
+[class*="chatContent_"],
+[class*="chatContent-"],
+[class*="content_"],
+[class*="content-"] {
+  background-color: var(--kc-sp-bg) !important;
+  border-color: var(--kc-sp-border) !important;
+}
+
+/* Mesaj alanı */
+[class*="scroller_"],
+[class*="scroller-"],
+[class*="messagesWrapper_"],
+[class*="messagesWrapper-"] {
+  background: transparent !important;
+  scrollbar-color: var(--kc-sp-pink-strong) transparent !important;
+  scrollbar-width: thin !important;
+}
+
+[class*="message_"],
+[class*="message-"] {
+  border-radius: 12px !important;
+  transition: background-color 0.18s ease !important;
+}
+
+[class*="message_"]:hover,
+[class*="message-"]:hover {
+  background: rgba(255, 214, 226, 0.055) !important;
+}
+
+[class*="groupStart_"],
+[class*="groupStart-"] {
+  margin-top: 6px !important;
+}
+
+/* Kanallar ve üyeler: geniş wrapper seçicileri özellikle kullanılmıyor. */
+[class*="channel_"],
+[class*="channel-"],
+[class*="containerDefault_"],
+[class*="containerDefault-"],
+[class*="member_"],
+[class*="member-"] {
+  border-radius: 10px !important;
+  transition: background-color 0.18s ease, color 0.18s ease !important;
+}
+
+[class*="containerDefault_"]:hover,
+[class*="containerDefault-"]:hover,
+[class*="member_"]:hover,
+[class*="member-"]:hover {
+  background: var(--kc-sp-panel-soft) !important;
+}
+
+[class*="modeSelected_"],
+[class*="modeSelected-"],
+[class*="selected_"],
+[class*="selected-"] {
+  background: rgba(216, 137, 164, 0.17) !important;
+  border-radius: 10px !important;
+}
+
+[class*="modeSelected_"] [class*="name_"],
+[class*="modeSelected-"] [class*="name-"],
+[class*="selected_"] [class*="name_"],
+[class*="selected-"] [class*="name-"] {
+  color: var(--kc-sp-pink) !important;
+}
+
+/* Ana sayfa / Discord logosu */
+[data-list-item-id="guildsnav___home"],
+[data-list-item-id="guildsnav___home"] > div,
+[aria-label="Home"],
+[aria-label="Ana Sayfa"] {
+  background-color: var(--kc-sp-panel) !important;
+  background-image: url("https://i.pinimg.com/736x/69/64/81/696481b88850e6e6d7be399b06c5c27c.jpg") !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+  border: 1px solid var(--kc-sp-border) !important;
+  border-radius: 16px !important;
+  box-shadow: var(--kc-sp-shadow) !important;
+  overflow: hidden !important;
+}
+
+[data-list-item-id="guildsnav___home"] svg,
+[aria-label="Home"] svg,
+[aria-label="Ana Sayfa"] svg {
+  opacity: 0 !important;
+}
+
+/* Mesaj yazma kutusu ve görseli */
+[class*="channelTextArea_"],
+[class*="channelTextArea-"],
+[class*="scrollableContainer_"],
+[class*="scrollableContainer-"] {
+  background-color: rgba(29, 26, 30, 0.88) !important;
+  background-image:
+    linear-gradient(rgba(29, 26, 30, 0.7), rgba(29, 26, 30, 0.7)),
+    url("https://i.pinimg.com/736x/6e/96/88/6e9688cc94d4bef9107abaae1403b637.jpg") !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: cover !important;
+  border: 1px solid var(--kc-sp-border) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.2) !important;
+}
+
+[class*="scrollableContainer_"],
+[class*="scrollableContainer-"] {
+  border-radius: 15px !important;
+}
+
+[class*="channelTextArea_"] textarea,
+[class*="channelTextArea-"] textarea,
+[contenteditable="true"] {
+  color: var(--kc-sp-text) !important;
+}
+
+[class*="channelTextArea_"] textarea::placeholder,
+[class*="channelTextArea-"] textarea::placeholder {
+  color: var(--kc-sp-muted) !important;
+}
+
+/* Discord bileşenleri */
+[class*="header_"],
+[class*="header-"],
+[class*="searchBar_"],
+[class*="searchBar-"] {
+  background: var(--kc-sp-panel) !important;
+  border-color: var(--kc-sp-border) !important;
+}
+
+[class*="popout_"],
+[class*="popout-"],
+[class*="menu_"],
+[class*="menu-"],
+[class*="autocomplete_"],
+[class*="autocomplete-"] {
+  background: rgba(29, 26, 30, 0.97) !important;
+  border: 1px solid var(--kc-sp-border) !important;
+  border-radius: 14px !important;
+  box-shadow: var(--kc-sp-shadow) !important;
+  backdrop-filter: blur(18px) !important;
+}
+
+[class*="username_"],
+[class*="username-"],
+[class*="title_"],
+[class*="title-"] {
+  color: var(--kc-sp-text) !important;
+}
+
+[class*="timestamp_"],
+[class*="timestamp-"],
+[class*="muted_"],
+[class*="muted-"],
+[class*="topic_"],
+[class*="topic-"] {
+  color: var(--kc-sp-muted) !important;
+}
+
+a,
+[class*="anchor_"],
+[class*="anchor-"] {
+  color: var(--kc-sp-pink) !important;
+}
+
+::selection {
+  background: var(--kc-sp-pink-strong) !important;
+  color: #fff !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--kc-sp-pink-strong) !important;
+  border: 3px solid transparent !important;
+  background-clip: padding-box !important;
+  border-radius: 999px !important;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent !important;
+}
