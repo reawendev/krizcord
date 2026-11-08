@@ -3,46 +3,85 @@
 // dışa aktarılıyor (ör. exports.Ay). Bu yüzden her modülün TÜM dışa aktarımlarına bakılır.
 
 export let wpRequire = null;
+let runtimes = []; // Discord'da birden fazla webpack/rspack çalışma zamanı aynı kanalı paylaşıyor
+
+// webpackChunkdiscord_app.push zincirinde HER çalışma zamanı paketi işler ve geri çağrıyı kendi
+// require fonksiyonuyla çağırır. Hepsini toplarız; en büyüğü asıl Discord uygulamasıdır.
+function collect() {
+  const chunk = window.webpackChunkdiscord_app;
+  if (!chunk) return [];
+  const found = new Set();
+  try {
+    chunk.push([[Symbol("krizcord")], {}, (r) => { if (r) found.add(r); }]);
+    chunk.pop();
+  } catch {
+    /* henüz hazır değil */
+  }
+  return [...found].filter((r) => r.c);
+}
+
+const size = (r) => {
+  try {
+    return Object.keys(r.c).length;
+  } catch {
+    return 0;
+  }
+};
 
 export function init(timeoutMs = 60000) {
   return new Promise((resolve, reject) => {
     const started = Date.now();
+    let best = 0;
+    let bestSince = 0;
     const timer = setInterval(() => {
-      const chunk = window.webpackChunkdiscord_app;
-      if (chunk) {
-        let req;
-        try {
-          chunk.push([[Symbol("krizcord")], {}, (r) => (req = r)]);
-          chunk.pop();
-        } catch {
-          /* henüz hazır değil */
-        }
-        if (req && req.c && Object.keys(req.c).length > 100) {
-          clearInterval(timer);
-          wpRequire = req;
-          return resolve(req);
-        }
+      const list = collect();
+      for (const r of list) if (!runtimes.includes(r)) runtimes.push(r);
+      runtimes.sort((a, b) => size(b) - size(a));
+      const top = runtimes[0] ? size(runtimes[0]) : 0;
+      if (top > best) {
+        best = top;
+        bestSince = Date.now();
+      }
+      // Asıl uygulama yüklendiyse (çok modül) ya da sayı 2 sn'dir artmıyorsa hazır say
+      const ready = top > 1500 || (top > 100 && Date.now() - bestSince > 2000);
+      if (ready) {
+        clearInterval(timer);
+        wpRequire = runtimes[0];
+        return resolve(wpRequire);
       }
       if (Date.now() - started > timeoutMs) {
         clearInterval(timer);
+        if (runtimes[0]) {
+          wpRequire = runtimes[0];
+          return resolve(wpRequire);
+        }
         reject(new Error("Discord webpack modülleri bulunamadı (zaman aşımı)"));
       }
     }, 250);
   });
 }
 
-export const moduleCount = () => (wpRequire?.c ? Object.keys(wpRequire.c).length : 0);
+/** Teşhis: her çalışma zamanındaki modül sayısı */
+export const runtimeSizes = () => runtimes.map(size);
+export const moduleCount = () => runtimes.reduce((n, r) => n + size(r), 0);
 
+let lastCollect = 0;
 function* exportsOf() {
-  if (!wpRequire) return;
-  for (const id in wpRequire.c) {
-    let exp;
-    try {
-      exp = wpRequire.c[id]?.exports;
-    } catch {
-      continue;
+  // Yeni çalışma zamanı eklenmiş olabilir (geç yüklenen paketler); en fazla 5 sn'de bir bak
+  if (Date.now() - lastCollect > 5000) {
+    lastCollect = Date.now();
+    for (const r of collect()) if (!runtimes.includes(r)) runtimes.push(r);
+  }
+  for (const r of runtimes) {
+    for (const id in r.c) {
+      let exp;
+      try {
+        exp = r.c[id]?.exports;
+      } catch {
+        continue;
+      }
+      if (exp && exp !== window && (typeof exp === "object" || typeof exp === "function")) yield exp;
     }
-    if (exp && exp !== window && (typeof exp === "object" || typeof exp === "function")) yield exp;
   }
 }
 

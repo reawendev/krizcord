@@ -133,7 +133,15 @@ async function boot() {
     Dispatcher: discord.Dispatcher(),
     TypingActions: discord.TypingActions(),
   }).map(([k, v]) => `${k}:${v ? "var" : "YOK"}`);
-  native().log?.("modüller:", found.join(" "), "| yüklü modül sayısı:", webpack.moduleCount());
+  native().log?.("modüller:", found.join(" "), "| çalışma zamanları (modül sayısı):", webpack.runtimeSizes().join(", "));
+  // Teşhis: temaları Discord'un gerçek sınıf adlarına göre ayarlamak için yerleşim iskeleti (bir kez)
+  setTimeout(() => {
+    try {
+      native().log?.("yerleşim iskeleti:\n" + themes.layoutSkeleton());
+    } catch (e) {
+      native().log?.("yerleşim iskeleti alınamadı:", String(e));
+    }
+  }, 12000);
 
   await plugins.loadUserPlugins();
   await plugins.startAll();

@@ -59,42 +59,177 @@ function readDirFiles(dir, ext) {
   }
 }
 
-const themeAssetCache = new Map();
+// --- Tema varlıkları -----------------------------------------------------------
+// Discord'un CSP'si dış CSS/resim/yazı tipi yüklemeyi engeller. Bu yüzden temadaki @import'lar ana
+// süreçte indirilip yerine gömülür; url(...) ile verilen resim ve yazı tipleri data: adresine çevrilir.
+const themeAssetCache = new Map(); // url -> data: adresi
+const themeCssCache = new Map(); // url -> işlenmiş CSS
+const MAX_ASSET = 10 * 1024 * 1024;
+const MAX_CSS = 3 * 1024 * 1024;
+
+const ASSET_MIME = {
+  ".gif": "image/gif", ".png": "image/png", ".webp": "image/webp", ".svg": "image/svg+xml",
+  ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".avif": "image/avif", ".ico": "image/x-icon",
+  ".woff2": "font/woff2", ".woff": "font/woff", ".ttf": "font/ttf", ".otf": "font/otf",
+  ".mp4": "video/mp4", ".webm": "video/webm",
+};
 
 function themeAssetMime(url, response) {
-  const contentType = response.headers.get("content-type")?.split(";")[0].trim();
-  if (contentType?.startsWith("image/")) return contentType;
-  const ext = path.extname(new URL(url).pathname).toLowerCase();
-  return ({ ".gif": "image/gif", ".png": "image/png", ".webp": "image/webp", ".svg": "image/svg+xml" })[ext] || "image/jpeg";
+  const type = response.headers.get("content-type")?.split(";")[0].trim();
+  if (type && /^(image|font|video)\//.test(type)) return type;
+  return ASSET_MIME[path.extname(new URL(url).pathname).toLowerCase()] || "application/octet-stream";
 }
 
-async function inlineThemeImages(css) {
-  const urls = [...new Set([...css.matchAll(/url\(\s*(['"]?)(https?:\/\/[^'")\s]+)\1\s*\)/gi)].map((m) => m[2]))];
-  if (!urls.length) return css;
+// GitHub "blob" sayfa adresini ham dosyaya çevir
+const rawUrl = (u) => u.replace(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\//, "https://raw.githubusercontent.com/$1/$2/");
 
-  const replacements = await Promise.all(
-    urls.map(async (url) => {
-      if (themeAssetCache.has(url)) return [url, themeAssetCache.get(url)];
+async function themeFetch(url) {
+  const response = await electron.net.fetch(rawUrl(url), { headers: { "User-Agent": "Krizcord-Theme" }, cache: "force-cache" });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response;
+}
+
+async function inlineAsset(url) {
+  if (themeAssetCache.has(url)) return themeAssetCache.get(url);
+  try {
+    const response = await themeFetch(url);
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (!bytes.length || bytes.length > MAX_ASSET) throw new Error("dosya boyutu geçersiz");
+    const data = `data:${themeAssetMime(url, response)};base64,${bytes.toString("base64")}`;
+    themeAssetCache.set(url, data);
+    return data;
+  } catch (e) {
+    log("tema varlığı alınamadı:", url, e.message || e);
+    themeAssetCache.set(url, null); // bu oturumda tekrar deneme
+    return null;
+  }
+}
+
+const absolute = (ref, base) => {
+  try {
+    return new URL(ref, base || undefined).href;
+  } catch {
+    return null;
+  }
+};
+
+const IMPORT_RE = /@import\s+(?:url\(\s*(['"]?)([^'")\s]+)\1\s*\)|(['"])([^'"]+)\3)([^;]*);/gi;
+const URL_RE = /url\(\s*(['"]?)([^'")]+?)\1\s*\)/gi;
+
+async function replaceAsync(str, re, fn) {
+  const jobs = [];
+  str.replace(re, (...m) => {
+    jobs.push(fn(...m));
+    return m[0];
+  });
+  const results = await Promise.all(jobs);
+  let i = 0;
+  return str.replace(re, () => results[i++]);
+}
+
+/**
+ * Temanın dış bağımlılıklarını gömer. base: CSS'in kendi adresi (@import ile gelen dosyalardaki göreli
+ * yollar için). depth: iç içe @import sınırı.
+ */
+async function inlineThemeAssets(css, base = null, depth = 0) {
+  // 1) @import'lar: indirip yerine koy (medya sorgusu varsa @media ile sar)
+  css = await replaceAsync(css, IMPORT_RE, async (whole, _q1, u1, _q2, u2, media) => {
+    const url = absolute(u1 || u2, base);
+    if (!url || !/^https?:/.test(url)) return whole;
+    if (/fonts\.googleapis\.com/.test(url) || depth >= 4) return await importFonts(url, whole, depth);
+    let inner = themeCssCache.get(url);
+    if (inner === undefined) {
       try {
-        const response = await electron.net.fetch(url, {
-          headers: { "User-Agent": "Krizcord-Theme" },
-          cache: "force-cache",
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const bytes = Buffer.from(await response.arrayBuffer());
-        if (!bytes.length || bytes.length > 10 * 1024 * 1024) throw new Error("görsel boyutu geçersiz");
-        const data = `data:${themeAssetMime(url, response)};base64,${bytes.toString("base64")}`;
-        themeAssetCache.set(url, data);
-        return [url, data];
+        const text = await (await themeFetch(url)).text();
+        if (text.length > MAX_CSS) throw new Error("CSS çok büyük");
+        inner = await inlineThemeAssets(text, url, depth + 1);
+        log("tema @import gömüldü:", url, `(${Math.round(inner.length / 1024)} KB)`);
       } catch (e) {
-        log("tema görseli alınamadı:", url, e.message || e);
-        return [url, null];
+        log("tema @import alınamadı:", url, e.message || e);
+        inner = null;
       }
-    })
-  );
+      themeCssCache.set(url, inner);
+    }
+    if (inner == null) return `/* Krizcord: alınamadı ${url} */`;
+    const m = (media || "").trim();
+    return m ? `@media ${m} {\n${inner}\n}` : inner;
+  });
 
-  return replacements.reduce((result, [url, data]) => (data ? result.split(url).join(data) : result), css);
+  // 2) url(...) — resim, yazı tipi vb. (göreli yollar base'e göre çözülür)
+  css = await replaceAsync(css, URL_RE, async (whole, _q, ref) => {
+    if (/^(data:|blob:|#)/i.test(ref)) return whole;
+    const url = absolute(ref, base);
+    if (!url || !/^https?:/.test(url)) return whole;
+    const data = await inlineAsset(url);
+    return data ? `url("${data}")` : whole;
+  });
+  return css;
 }
+
+// Google Fonts gibi CSS döndüren @import'lar da aynı yolla gömülür
+async function importFonts(url, whole, depth) {
+  if (depth >= 4) return whole;
+  try {
+    const text = await (await themeFetch(url)).text();
+    return await inlineThemeAssets(text, url, depth + 1);
+  } catch (e) {
+    log("yazı tipi CSS'i alınamadı:", url, e.message || e);
+    return `/* Krizcord: alınamadı ${url} */`;
+  }
+}
+
+
+// --- Tema arka planı (GIF / video / resim) ------------------------------------------
+// Tema başlığındaki "@background" değeri: bir adres (https://...) ya da themes klasöründeki dosya adı.
+// Uzantısız ad verilirse (ör. "arkaplan") themes klasöründe arkaplan.mp4/.webm/.gif/... aranır.
+const MEDIA_CACHE = path.join(DATA_DIR, "cache");
+const MEDIA_MAX = 200 * 1024 * 1024;
+const MEDIA_EXTS = [".mp4", ".webm", ".mov", ".gif", ".webp", ".png", ".jpg", ".jpeg", ".avif"];
+const MIME_EXT = { "video/mp4": ".mp4", "video/webm": ".webm", "video/quicktime": ".mov", "image/gif": ".gif", "image/webp": ".webp", "image/png": ".png", "image/jpeg": ".jpg", "image/avif": ".avif" };
+
+async function resolveMedia(ref) {
+  if (/^https?:\/\//i.test(ref)) {
+    const hash = require("crypto").createHash("sha1").update(ref).digest("hex").slice(0, 16);
+    fs.mkdirSync(MEDIA_CACHE, { recursive: true });
+    const cached = fs.readdirSync(MEDIA_CACHE).find((f) => f.startsWith(hash + "."));
+    if (cached) return path.join(MEDIA_CACHE, cached);
+    const response = await themeFetch(ref);
+    const type = response.headers.get("content-type")?.split(";")[0].trim();
+    const ext = MIME_EXT[type] || path.extname(new URL(ref).pathname).toLowerCase();
+    if (!MEDIA_EXTS.includes(ext)) throw new Error(`desteklenmeyen medya türü: ${type || ext || "?"}`);
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (!bytes.length || bytes.length > MEDIA_MAX) throw new Error("dosya çok büyük (en fazla 200 MB)");
+    const file = path.join(MEDIA_CACHE, hash + ext);
+    fs.writeFileSync(file, bytes);
+    log("tema arka planı indirildi:", ref, `(${Math.round(bytes.length / 1048576)} MB)`);
+    return file;
+  }
+  const name = path.basename(ref); // klasör dışına çıkılamaz
+  const direct = path.join(THEMES_DIR, name);
+  if (path.extname(name) && fs.existsSync(direct)) return direct;
+  for (const ext of MEDIA_EXTS) {
+    const f = path.join(THEMES_DIR, name + ext);
+    if (fs.existsSync(f)) return f;
+  }
+  throw new Error(`themes klasöründe bulunamadı: ${name}`);
+}
+
+// known: renderer'daki mevcut medyanın damgası; değişmediyse veri tekrar gönderilmez
+ipcMain.handle("krizcord:theme-media", async (_e, ref, known) => {
+  try {
+    const file = await resolveMedia(String(ref || "").trim());
+    const st = fs.statSync(file);
+    if (st.size > MEDIA_MAX) throw new Error("dosya çok büyük (en fazla 200 MB)");
+    const stamp = `${file}|${st.size}|${st.mtimeMs}`;
+    if (stamp === known) return { same: true, stamp };
+    const ext = path.extname(file).toLowerCase();
+    const mime = Object.keys(MIME_EXT).find((m) => MIME_EXT[m] === ext) || (ext === ".jpeg" ? "image/jpeg" : "application/octet-stream");
+    return { stamp, mime, data: fs.readFileSync(file) };
+  } catch (e) {
+    log("tema arka planı yüklenemedi:", ref, e.message || e);
+    return { error: String(e.message || e) };
+  }
+});
 
 // --- IPC ---------------------------------------------------------------
 
@@ -131,7 +266,7 @@ ipcMain.handle("krizcord:list-plugins", () =>
 
 ipcMain.handle("krizcord:list-themes", async () => {
   const files = readDirFiles(THEMES_DIR, ".css");
-  return Promise.all(files.map(async ({ file, content }) => ({ file, css: await inlineThemeImages(content) })));
+  return Promise.all(files.map(async ({ file, content }) => ({ file, css: await inlineThemeAssets(content) })));
 });
 
 ipcMain.handle("krizcord:open-folder", (_e, kind) => {
@@ -486,6 +621,68 @@ try {
   log("BrowserWindow yaması BAŞARISIZ:", err);
 }
 
-app.once("ready", () => {
-  log("app ready");
-});
+// --- İçerik Güvenlik Politikası (CSP) ----------------------------------------------
+// Arka plan GIF/videosu blob: adresiyle oynatılır. Discord'un CSP'sinde yalnızca img-src ve media-src
+// yönergelerine blob: data: eklenir; script yönergelerine DOKUNULMAZ.
+const CSP_RELAX = ["img-src", "media-src"];
+const CSP_ADD = ["blob:", "data:"];
+
+function relaxCsp(value) {
+  const directives = String(value).split(";").map((d) => d.trim()).filter(Boolean);
+  const names = directives.map((d) => d.split(/\s+/)[0].toLowerCase());
+  const out = directives.map((d) => {
+    const [name, ...vals] = d.split(/\s+/);
+    if (!CSP_RELAX.includes(name.toLowerCase()) || vals.includes("*")) return d;
+    return [name, ...vals, ...CSP_ADD.filter((x) => !vals.includes(x))].join(" ");
+  });
+  for (const name of CSP_RELAX) {
+    if (!names.includes(name) && names.includes("default-src")) out.push(`${name} 'self' https: ${CSP_ADD.join(" ")}`);
+  }
+  return out.join("; ");
+}
+
+// Electron'da oturum başına tek onHeadersReceived dinleyicisi olabilir. Bizimki kalıcı kaydedilir;
+// Discord kendi dinleyicisini kaydederse yakalanır ve bizimkinin içinden çağrılır.
+function installCspPatch() {
+  try {
+    const wr = electron.session.defaultSession.webRequest;
+    const original = wr.onHeadersReceived.bind(wr);
+    let other = null;
+    let logged = false;
+    original((details, callback) => {
+      const finish = (res = {}) => {
+        const headers = res.responseHeaders || details.responseHeaders;
+        if (headers && details.resourceType === "mainFrame") {
+          for (const key of Object.keys(headers)) {
+            if (key.toLowerCase() !== "content-security-policy") continue;
+            headers[key] = [].concat(headers[key]).map(relaxCsp);
+            if (!logged) {
+              logged = true;
+              log("CSP genişletildi (arka plan medyası için blob:/data:)");
+            }
+          }
+        }
+        callback({ ...res, cancel: !!res.cancel, responseHeaders: headers });
+      };
+      if (!other) return finish();
+      try {
+        other(details, finish);
+      } catch (err) {
+        log("diğer başlık dinleyicisi hata verdi:", err);
+        finish();
+      }
+    });
+    wr.onHeadersReceived = (a, b) => {
+      other = typeof a === "function" ? a : typeof b === "function" ? b : null;
+    };
+    log("CSP yaması kuruldu");
+  } catch (err) {
+    log("CSP yaması kurulamadı:", err);
+  }
+}
+
+// Discord çekirdeği uygulama hazır olduktan SONRA yüklendiği için "ready" olayı burada hiç tetiklenmez
+if (app.isReady()) installCspPatch();
+else app.once("ready", installCspPatch);
+
+module.exports = { relaxCsp }; // test için

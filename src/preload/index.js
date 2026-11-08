@@ -38,6 +38,7 @@ const native = {
   themeDelete: (file) => ipcRenderer.invoke("krizcord:theme-delete", String(file)),
   themeOpen: (file) => ipcRenderer.invoke("krizcord:theme-open", String(file)),
   themeFetch: (url) => ipcRenderer.invoke("krizcord:theme-fetch", String(url)),
+  themeMedia: (ref, known) => ipcRenderer.invoke("krizcord:theme-media", String(ref), known ? String(known) : null),
   onThemesChanged: (cb) => {
     ipcRenderer.on("krizcord:themes-changed", () => cb());
   },
