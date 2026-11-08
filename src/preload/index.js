@@ -25,6 +25,11 @@ const native = {
   openFolder: (kind) => ipcRenderer.invoke("krizcord:open-folder", kind),
   getBadges: () => ipcRenderer.invoke("krizcord:get-badges"),
   refreshBadges: () => ipcRenderer.invoke("krizcord:refresh-badges"),
+  updateStatus: () => ipcRenderer.invoke("krizcord:update-status"),
+  checkUpdates: () => ipcRenderer.invoke("krizcord:update-check"),
+  setAutoUpdate: (on) => ipcRenderer.invoke("krizcord:set-auto-update", !!on),
+  relaunch: () => ipcRenderer.invoke("krizcord:relaunch"),
+  toggleDevTools: () => ipcRenderer.send("krizcord:toggle-devtools"),
   log: (...a) => ipcRenderer.send("krizcord:log", "renderer", ...a.map(String)),
 };
 

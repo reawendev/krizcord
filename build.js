@@ -1,6 +1,13 @@
 const esbuild = require("esbuild");
+const { version } = require("./package.json");
 
-const common = { bundle: true, logLevel: "info", legalComments: "none" };
+// Sürüm tek kaynaktan (package.json) gelir; güncelleyici bunu GitHub'daki etiketle karşılaştırır.
+const common = {
+  bundle: true,
+  logLevel: "info",
+  legalComments: "none",
+  define: { __KRIZCORD_VERSION__: JSON.stringify(version) },
+};
 
 Promise.all([
   esbuild.build({

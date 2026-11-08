@@ -37,6 +37,32 @@ Discord'u otomatik kapatıp açabilir. Discord güncellendikten sonra **Onar**'a
 - Hata ayıklama günlüğü: `%APPDATA%\krizcord\krizcord.log`. Geliştirici araçları: **Ctrl + Shift + I**.
 - Panelde eklentileri/temaları aç-kapat. Ayarlar `%APPDATA%\krizcord\settings.json` içinde.
 
+## Çember menü
+
+**Ctrl + Shift + Boşluk** (panelden değiştirilebilir) farenin olduğu yerde hızlı bir çember menü açar.
+İçine kısayollar (Discord'u yenile, ID'mi kopyala, temaları aç/kapat...) ve eklenti aç/kapa düğmeleri konabilir:
+**Panel > Çember menü**. Açıkken 1–8 tuşları öğeleri çalıştırır. Eklentiler kendi öğesini ekleyebilir:
+
+```js
+Krizcord.circle.register({ id: "selam", label: "Selam yaz", icon: "zap", run: () => { /* ... */ } });
+```
+
+## Güncellemeler ve sürüm yayınlama
+
+Krizcord açılıştan 15 sn sonra ve 6 saatte bir GitHub Releases'i denetler; yeni sürümü arka planda indirir,
+Discord yeniden başlatılınca uygular (panel > Güncellemeler). Installer da kurarken her zaman **en son sürümü** indirir,
+yani her güncellemede yeni installer gerekmez.
+
+Yeni sürüm yayınlamak (kendi bilgisayarından):
+
+```bash
+npm version patch        # 0.1.0 -> 0.1.1, commit + v0.1.1 etiketi oluşturur (minor / major da olur)
+git push --follow-tags
+```
+
+GitHub Actions (`.github/workflows/release.yml`) derler ve `main.js`, `preload.js`, `renderer.js` ile
+`Krizcord-Kurulum.exe`'yi o sürüme ekler. Kullanıcılar birkaç saat içinde (ya da panelden **Denetle** ile hemen) alır.
+
 ## Rozetler
 
 Krizcord kullananlara, `badges.json` içinde ID'si tanımlı kullanıcıların yanında rozet görünür

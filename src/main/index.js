@@ -68,11 +68,15 @@ ipcMain.on("krizcord:orig-preload", (e) => {
   e.returnValue = origPreloads.get(e.sender.id) || null;
 });
 
+// renderer.js bu oturumun başında bir kez okunur. Böylece arka planda güncelleme indirilse bile
+// Ctrl+R ile yenilenen sayfa eski ana süreçle uyumsuz yeni kodu almaz; yeni sürüm yeniden başlatınca gelir.
+let rendererCode = null;
 ipcMain.on("krizcord:renderer-code", (e) => {
   try {
-    e.returnValue = fs.readFileSync(RENDERER, "utf8");
+    rendererCode ??= fs.readFileSync(RENDERER, "utf8");
+    e.returnValue = rendererCode;
   } catch (err) {
-    console.error("[Krizcord] renderer.js okunamadı:", err);
+    log("renderer.js okunamadı:", err);
     e.returnValue = null;
   }
 });
@@ -146,6 +150,133 @@ ipcMain.handle("krizcord:refresh-badges", () => refreshBadges());
 app.whenReady().then(() => {
   refreshBadges();
   setInterval(refreshBadges, 30 * 60 * 1000).unref?.();
+});
+
+// --- Otomatik güncelleme ----------------------------------------------------
+// GitHub Releases'teki en son sürüm denetlenir. Daha yeniyse main.js / preload.js / renderer.js indirilir,
+// önce ".new" olarak yazılıp sonra hep birlikte değiştirilir (yarım güncelleme olmaz).
+// Yeni kod Discord yeniden başlatılınca devreye girer.
+
+/* global __KRIZCORD_VERSION__ */
+const VERSION = typeof __KRIZCORD_VERSION__ === "string" ? __KRIZCORD_VERSION__ : "0.0.0-dev";
+const UPDATE_API = process.env.KRIZCORD_UPDATE_API || "https://api.github.com/repos/reawendev/krizcord/releases/latest";
+const UPDATER_FILE = path.join(DATA_DIR, "updater.json");
+const DIST_FILES = ["main.js", "preload.js", "renderer.js"];
+const ALLOWED_HOSTS = new Set(["github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com"]);
+
+let update = {
+  status: "idle", // idle | checking | up-to-date | available | downloading | ready | no-release | error
+  current: VERSION,
+  latest: null,
+  notes: null,
+  error: null,
+  checkedAt: null,
+  auto: readJson(UPDATER_FILE, {}).auto !== false,
+};
+let pendingVersion = null;
+let checking = null;
+
+function isNewer(a, b) {
+  const pa = String(a).split(/[.-]/).map((n) => parseInt(n, 10) || 0);
+  const pb = String(b).split(/[.-]/).map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+  return false;
+}
+
+function assetAllowed(url) {
+  if (process.env.KRIZCORD_UPDATE_API) return true; // yalnızca geliştirme/test için
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && ALLOWED_HOSTS.has(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+async function downloadRelease(rel) {
+  const assets = Array.isArray(rel.assets) ? rel.assets : [];
+  const files = [];
+  for (const name of DIST_FILES) {
+    const asset = assets.find((a) => a && a.name === name);
+    if (!asset || !asset.browser_download_url) throw new Error(`sürümde ${name} dosyası yok`);
+    if (!assetAllowed(asset.browser_download_url)) throw new Error("izin verilmeyen indirme adresi");
+    const res = await electron.net.fetch(asset.browser_download_url, { headers: { "User-Agent": "Krizcord-Updater" }, cache: "no-store" });
+    if (!res.ok) throw new Error(`${name} indirilemedi (HTTP ${res.status})`);
+    const text = await res.text();
+    if (text.length < 200) throw new Error(`${name} beklenenden küçük`);
+    files.push([name, text]);
+  }
+  for (const [name, text] of files) fs.writeFileSync(path.join(__dirname, name + ".new"), text);
+  for (const [name] of files) fs.renameSync(path.join(__dirname, name + ".new"), path.join(__dirname, name));
+}
+
+async function checkForUpdates({ manual = false } = {}) {
+  if (checking) return checking;
+  checking = (async () => {
+    update = { ...update, status: "checking", error: null };
+    try {
+      const res = await electron.net.fetch(UPDATE_API, {
+        headers: { Accept: "application/vnd.github+json", "User-Agent": "Krizcord-Updater" },
+        cache: "no-store",
+      });
+      if (res.status === 404) {
+        update = { ...update, status: "no-release", checkedAt: Date.now() };
+        return update;
+      }
+      if (!res.ok) throw new Error("GitHub yanıtı HTTP " + res.status);
+      const rel = await res.json();
+      const latest = String(rel.tag_name || "").replace(/^v/i, "");
+      if (!/^\d+\.\d+\.\d+/.test(latest)) throw new Error("geçersiz sürüm etiketi: " + rel.tag_name);
+      update = { ...update, latest, notes: typeof rel.body === "string" && rel.body.trim() ? rel.body.slice(0, 4000) : null, checkedAt: Date.now() };
+      if (!isNewer(latest, VERSION)) {
+        update.status = "up-to-date";
+      } else if (pendingVersion === latest) {
+        update.status = "ready";
+      } else if (!manual && !update.auto) {
+        update.status = "available";
+      } else {
+        update.status = "downloading";
+        await downloadRelease(rel);
+        pendingVersion = latest;
+        update.status = "ready";
+        log("güncelleme indirildi:", VERSION, "->", latest);
+      }
+    } catch (err) {
+      update = { ...update, status: "error", error: String(err.message || err), checkedAt: Date.now() };
+      log("güncelleme denetimi başarısız:", err);
+    }
+    return update;
+  })();
+  try {
+    return await checking;
+  } finally {
+    checking = null;
+  }
+}
+
+ipcMain.handle("krizcord:update-status", () => update);
+ipcMain.handle("krizcord:update-check", () => checkForUpdates({ manual: true }));
+ipcMain.handle("krizcord:set-auto-update", (_e, on) => {
+  update = { ...update, auto: !!on };
+  try {
+    fs.writeFileSync(UPDATER_FILE, JSON.stringify({ auto: update.auto }));
+  } catch (err) {
+    log("updater.json yazılamadı:", err);
+  }
+  if (on && update.status !== "ready") checkForUpdates();
+  return update;
+});
+ipcMain.handle("krizcord:relaunch", () => {
+  log("yeniden başlatılıyor (güncelleme uygulanacak)");
+  app.relaunch();
+  app.exit(0);
+});
+ipcMain.on("krizcord:toggle-devtools", (e) => e.sender.toggleDevTools());
+
+app.whenReady().then(() => {
+  log("Krizcord sürümü:", VERSION);
+  setTimeout(() => checkForUpdates(), 15 * 1000);
+  setInterval(() => checkForUpdates(), 6 * 60 * 60 * 1000).unref?.();
 });
 
 // DİKKAT: Sınıfın adı tam olarak "BrowserWindow" olmalı. Electron, BrowserWindow.fromId() ve

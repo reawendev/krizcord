@@ -119,13 +119,14 @@
     busy = true; render();
     const opts = { kill: $("kill").checked };
     const label = channels.find((c) => c.key === selected).label;
-    log(`${label}: ${kind === "uninstall" ? "kaldırılıyor" : "kuruluyor"}...`);
+    log(`${label}: ${kind === "uninstall" ? "kaldırılıyor" : "en son sürüm denetleniyor ve kuruluyor"}...`);
     const res = kind === "uninstall"
       ? await window.installer.uninstall(selected, opts)
       : await window.installer.install(selected, opts);
     if (res.ok) {
       log(kind === "uninstall" ? "✔ Krizcord kaldırıldı." : "✔ Krizcord kuruldu.", "ok");
-      if (kind !== "uninstall") log("Panel: Ctrl+Shift+K veya Kullanıcı Ayarları > Krizcord", "info");
+      if (kind !== "uninstall" && res.source) log("Kaynak: " + res.source, "info");
+      if (kind !== "uninstall") log("Panel: Ctrl+Shift+K · Çember menü: Ctrl+Shift+Boşluk · Sonraki sürümler otomatik gelir", "info");
       if ($("launch").checked) {
         const l = await window.installer.launch(selected);
         l.ok ? log("Discord açılıyor...", "info") : log("✖ " + l.error, "err");

@@ -1,6 +1,7 @@
 import * as settings from "./settings";
 
 let themeList = [];
+let paused = false; // oturumluk: çember menüden "temaları aç/kapat"
 
 function isEnabled(file) {
   const v = settings.get().themes[file];
@@ -13,6 +14,7 @@ function styleId(file) {
 
 function apply() {
   document.querySelectorAll("style[data-krizcord-theme]").forEach((n) => n.remove());
+  if (paused) return;
   for (const t of themeList) {
     if (!isEnabled(t.file)) continue;
     const style = document.createElement("style");
@@ -38,6 +40,15 @@ export function setEnabled(file, on) {
   settings.save();
   apply();
 }
+
+// Tüm temaları bu oturum için geçici olarak kapatır / geri açar. Kayıtlı seçimleri değiştirmez.
+export function togglePause() {
+  paused = !paused;
+  apply();
+  return paused;
+}
+
+export const isPaused = () => paused;
 
 export function list() {
   return themeList.map((t) => ({ file: t.file, enabled: isEnabled(t.file) }));

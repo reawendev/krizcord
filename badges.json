@@ -4,4 +4,8 @@
     "krizcord": { "name": "Krizcord Kullanıcısı", "color": "#7c5cff" }
   },
   "users": {"1532117171319079132": ["kurucu", "krizcord"]}
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 0453fb9 (Yeni panel, çember menü ve otomatik güncelleme)

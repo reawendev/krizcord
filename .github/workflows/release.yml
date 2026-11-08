@@ -1,0 +1,54 @@
+# "v" ile başlayan bir etiket push'lanınca Krizcord'u derler ve GitHub Releases'e yayınlar.
+# Yayınlanan main.js / preload.js / renderer.js dosyalarını kullanıcıların Krizcord'u otomatik indirir;
+# Krizcord-Kurulum.exe de aynı sürüme eklenir (yeni kullanıcılar için).
+#
+# Kullanım:  npm version patch   (veya minor / major)
+#            git push --follow-tags
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Etiket ile package.json sürümü aynı mı?
+        shell: bash
+        run: |
+          v="v$(node -p "require('./package.json').version")"
+          if [ "$v" != "$GITHUB_REF_NAME" ]; then
+            echo "Etiket ($GITHUB_REF_NAME) ile package.json sürümü ($v) farklı. 'npm version' kullan."
+            exit 1
+          fi
+
+      - name: Krizcord'u derle
+        run: |
+          npm install
+          npm run build
+
+      - name: Installer'ı derle
+        run: |
+          npm --prefix installer-app install
+          npm --prefix installer-app run build
+
+      - name: Sürümü yayınla
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/main.js
+            dist/preload.js
+            dist/renderer.js
+            installer-app/release/Krizcord-Kurulum.exe

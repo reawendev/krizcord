@@ -5,6 +5,8 @@ import * as plugins from "./plugins";
 import * as themes from "./themes";
 import * as ui from "./ui";
 import * as badges from "./badges";
+import * as circle from "./circle";
+import { t } from "./i18n";
 import { VERSION, BRAND } from "./brand";
 import builtinPlugins from "../plugins/index";
 
@@ -14,16 +16,74 @@ async function domReady() {
   }
 }
 
+const native = () => window.KrizcordNative;
+
+// Çember menünün yerleşik kısayolları. Eklentiler Krizcord.circle.register(...) ile kendi kısayollarını ekleyebilir.
+function registerCircleActions() {
+  circle.register({ id: "panel", label: "Krizcord paneli", icon: "layoutDashboard", run: () => ui.show() });
+  circle.register({ id: "reload", label: "Discord'u yenile", icon: "rotateCcw", run: () => location.reload() });
+  circle.register({
+    id: "copy-id",
+    label: "ID'mi kopyala",
+    icon: "copy",
+    run: async () => {
+      const id = badges.myId();
+      if (!id) return;
+      await navigator.clipboard.writeText(id);
+      return { toast: t("toast.copied") };
+    },
+  });
+  circle.register({
+    id: "themes-toggle",
+    label: "Temaları aç/kapat",
+    icon: "palette",
+    run: () => ({ toast: themes.togglePause() ? t("toast.themesPaused") : t("toast.themesResumed") }),
+  });
+  circle.register({
+    id: "badges-refresh",
+    label: "Rozetleri yenile",
+    icon: "award",
+    run: async () => {
+      await badges.refresh();
+      return { toast: t("toast.badgesRefreshed") };
+    },
+  });
+  circle.register({ id: "devtools", label: "Geliştirici araçları", icon: "terminal", run: () => native().toggleDevTools() });
+  circle.register({ id: "plugins-folder", label: "Eklenti klasörü", icon: "folderOpen", run: () => native().openFolder("plugins") });
+  circle.register({ id: "themes-folder", label: "Tema klasörü", icon: "palette", run: () => native().openFolder("themes") });
+  circle.register({ id: "updates", label: "Güncellemeler", icon: "download", run: () => ui.show("updates") });
+  circle.register({ id: "circle-settings", label: "Çember menü ayarları", icon: "circleDot", run: () => ui.show("circle") });
+}
+
+// Güncelleme durumunu izler; yeni sürüm indirildiğinde bir kez bildirim gösterir.
+function watchUpdates() {
+  let notified = null;
+  const poll = async () => {
+    try {
+      const s = await native().updateStatus();
+      ui.setUpdateState(s);
+      if (s.status === "ready" && notified !== s.latest) {
+        notified = s.latest;
+        ui.toast(`Krizcord ${s.latest} ${t("updates.toast")}`, { label: t("updates.restart"), run: () => native().relaunch() });
+      }
+    } catch {
+      /* eski ana süreçte bu IPC olmayabilir */
+    }
+  };
+  poll();
+  setInterval(poll, 60 * 1000);
+}
+
 async function boot() {
   if (!/(^|\.)discord\.com$/.test(location.hostname)) return;
   if (window.Krizcord) return;
-  if (!window.KrizcordNative) {
+  if (!native()) {
     console.warn("[Krizcord] KrizcordNative bulunamadı, başlatılmadı.");
     return;
   }
 
   await settings.load();
-  window.KrizcordNative.log?.("başlatılıyor:", location.href);
+  native().log?.("başlatılıyor:", location.href, "sürüm", VERSION);
 
   window.Krizcord = {
     version: VERSION,
@@ -34,16 +94,20 @@ async function boot() {
     plugins,
     ui,
     badges,
+    circle: { register: circle.register, unregister: circle.unregister, open: circle.open, close: circle.close },
     definePlugin: (def) => plugins.define(def, "user"),
   };
 
   for (const p of builtinPlugins) plugins.define(p, "builtin");
+  registerCircleActions();
 
   // Arayüz ve temalar Discord'un webpack'ine bağlı değil; önce onlar gelsin.
   await domReady();
   await themes.reload();
   ui.mount();
-  window.KrizcordNative.log?.("arayüz yüklendi");
+  circle.install({ toast: (msg) => ui.toast(msg) });
+  native().log?.("arayüz yüklendi");
+  watchUpdates();
 
   console.log(
     `%c${BRAND.name} %cv${VERSION} yüklendi`,
