@@ -3,5 +3,5 @@
     "krizcord": { "name": "Krizcord Kullanıcısı", "color": "#7c5cff" },
     "kurucu": { "name": "Krizcord Kurucusu", "color": "#f5a623" }
   },
-  "users": {"DISCORD_ID": ["1532117171319079132"]}
+  "users": {"1532117171319079132": ["kurucu", "krizcord"]}
 }
