@@ -59,6 +59,43 @@ function readDirFiles(dir, ext) {
   }
 }
 
+const themeAssetCache = new Map();
+
+function themeAssetMime(url, response) {
+  const contentType = response.headers.get("content-type")?.split(";")[0].trim();
+  if (contentType?.startsWith("image/")) return contentType;
+  const ext = path.extname(new URL(url).pathname).toLowerCase();
+  return ({ ".gif": "image/gif", ".png": "image/png", ".webp": "image/webp", ".svg": "image/svg+xml" })[ext] || "image/jpeg";
+}
+
+async function inlineThemeImages(css) {
+  const urls = [...new Set([...css.matchAll(/url\(\s*(['"]?)(https?:\/\/[^'")\s]+)\1\s*\)/gi)].map((m) => m[2]))];
+  if (!urls.length) return css;
+
+  const replacements = await Promise.all(
+    urls.map(async (url) => {
+      if (themeAssetCache.has(url)) return [url, themeAssetCache.get(url)];
+      try {
+        const response = await electron.net.fetch(url, {
+          headers: { "User-Agent": "Krizcord-Theme" },
+          cache: "force-cache",
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const bytes = Buffer.from(await response.arrayBuffer());
+        if (!bytes.length || bytes.length > 10 * 1024 * 1024) throw new Error("görsel boyutu geçersiz");
+        const data = `data:${themeAssetMime(url, response)};base64,${bytes.toString("base64")}`;
+        themeAssetCache.set(url, data);
+        return [url, data];
+      } catch (e) {
+        log("tema görseli alınamadı:", url, e.message || e);
+        return [url, null];
+      }
+    })
+  );
+
+  return replacements.reduce((result, [url, data]) => (data ? result.split(url).join(data) : result), css);
+}
+
 // --- IPC ---------------------------------------------------------------
 
 // Orijinal Discord preload yolu, pencere id'sine göre saklanır.
@@ -92,9 +129,10 @@ ipcMain.handle("krizcord:list-plugins", () =>
   readDirFiles(PLUGINS_DIR, ".js").map(({ file, content }) => ({ file, code: content }))
 );
 
-ipcMain.handle("krizcord:list-themes", () =>
-  readDirFiles(THEMES_DIR, ".css").map(({ file, content }) => ({ file, css: content }))
-);
+ipcMain.handle("krizcord:list-themes", async () => {
+  const files = readDirFiles(THEMES_DIR, ".css");
+  return Promise.all(files.map(async ({ file, content }) => ({ file, css: await inlineThemeImages(content) })));
+});
 
 ipcMain.handle("krizcord:open-folder", (_e, kind) => {
   const dir = kind === "plugins" ? PLUGINS_DIR : kind === "themes" ? THEMES_DIR : DATA_DIR;
